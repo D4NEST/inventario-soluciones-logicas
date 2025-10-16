@@ -717,4 +717,5 @@ document.addEventListener("DOMContentLoaded", async () => {
     console.log("✅ Sistema de inventario seguro inicializado");
 });
    
+ / /   V e r s i o n :   1 0 / 1 6 / 2 0 2 5   1 7 : 3 2 : 1 6  
  

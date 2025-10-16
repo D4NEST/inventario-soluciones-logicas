@@ -17,33 +17,39 @@ load_dotenv()
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 
-# 🔐 CONFIGURACIÓN DE SEGURIDAD MEJORADA
+# 🔐 CONFIGURACIÓN DE SEGURIDAD MEJORADA PARA RENDER
 app.secret_key = os.environ.get('SECRET_KEY', 'clave-secreta-desarrollo-32-caracteres-aqui')
 app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SECURE'] = False  # False para desarrollo HTTP
+app.config['SESSION_COOKIE_SECURE'] = True  # True para producción (HTTPS)
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_DOMAIN'] = None
 app.config['SESSION_COOKIE_PATH'] = '/'
 app.config['SESSION_COOKIE_NAME'] = 'inventario_session'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=8)
 
-# CORS CONFIGURACIÓN MEJORADA
+# CORS CONFIGURACIÓN MEJORADA PARA RENDER
 CORS(app, 
      supports_credentials=True,
-     origins=['https://inventario-soluciones-logicas-production.up.railway.app', 'http://localhost:5000', 'http://127.0.0.1:5000'],
+     origins=[
+         'https://inventario-soluciones-logicas.onrender.com',
+         'http://localhost:3000',
+         'http://127.0.0.1:3000',
+         'http://localhost:5000',
+         'http://127.0.0.1:5000'
+     ],
      methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
      allow_headers=['Content-Type', 'Authorization', 'X-Requested-With'],
      expose_headers=['Set-Cookie'])
 
-# --- CONFIGURACIÓN DE SUPABASE ---
+# --- CONFIGURACIÓN DE BASE DE DATOS ---
 DB_HOST = os.environ.get('DB_HOST')
-DB_PORT = os.environ.get('DB_PORT')
+DB_PORT = os.environ.get('DB_PORT', '5432')
 DB_NAME = os.environ.get('DB_NAME')
 DB_USER = os.environ.get('DB_USER')
 DB_PASS = os.environ.get('DB_PASS')
 
 def get_db_connection():
-    """Establece la conexión con Supabase usando psycopg2."""
+    """Establece la conexión con la base de datos usando psycopg2."""
     try:
         conn = psycopg2.connect(
             host=DB_HOST,
@@ -55,7 +61,7 @@ def get_db_connection():
         )
         return conn
     except Exception as e:
-        print(f"❌ Error de conexión: {e}")
+        print(f"❌ Error de conexión a la base de datos: {e}")
         return None
 
 # ------------------------------------------------------------------
@@ -436,13 +442,10 @@ def obtener_seriales_por_producto(producto_id):
 # ------------------------------------------------------------------
 # INICIO DE LA APLICACIÓN
 # ------------------------------------------------------------------
-# ------------------------------------------------------------------
-# INICIO DE LA APLICACIÓN
-# ------------------------------------------------------------------
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    print("🚀 Iniciando servidor Flask seguro...")
+    port = int(os.environ.get('PORT', 10000))
+    print("🚀 Iniciando servidor Flask en Render...")
     print(f"🔐 Usuario: admin")
     print(f"🔐 Contraseña: Admin123!")
-    print(f"🌐 Servidor: http://0.0.0.0:{port}")
+    print(f"🌐 Servidor ejecutándose en puerto: {port}")
     app.run(debug=False, host='0.0.0.0', port=port)

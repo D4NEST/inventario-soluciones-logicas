@@ -1,61 +1,61 @@
 // ====================================================================
-// CONFIGURACIÓN SEGURA
+// CONFIGURACIÓN SEGURA - USAR MISMO DOMINIO
 // ====================================================================
-const API_BASE_URL = "https://inventario-soluciones-logicas-production.up.railway.app/api"
-const AUTH_URL = `${API_BASE_URL}/auth`
-const INVENTARIO_URL = `${API_BASE_URL}/inventario`
+const API_BASE_URL = ""; // Usar mismo dominio
+const AUTH_URL = `/api/auth`;
+const INVENTARIO_URL = `/api/inventario`;
 
 // ====================================================================
 // ELEMENTOS DEL DOM
 // ====================================================================
-const loginContainer = document.getElementById("loginContainer")
-const dashboard = document.getElementById("dashboard")
-const loginForm = document.getElementById("loginForm")
-const loginError = document.getElementById("loginError")
-const logoutBtn = document.getElementById("logoutBtn")
-const userName = document.getElementById("userName")
-const userInitial = document.getElementById("userInitial")
+const loginContainer = document.getElementById("loginContainer");
+const dashboard = document.getElementById("dashboard");
+const loginForm = document.getElementById("loginForm");
+const loginError = document.getElementById("loginError");
+const logoutBtn = document.getElementById("logoutBtn");
+const userName = document.getElementById("userName");
+const userInitial = document.getElementById("userInitial");
 
-const inventoryTableBody = document.getElementById("inventoryTableBody")
-const totalItems = document.getElementById("totalItems")
-const lowStockItems = document.getElementById("lowStockItems")
-const totalValue = document.getElementById("totalValue")
+const inventoryTableBody = document.getElementById("inventoryTableBody");
+const totalItems = document.getElementById("totalItems");
+const lowStockItems = document.getElementById("lowStockItems");
+const totalValue = document.getElementById("totalValue");
 
 // Elementos para seriales
-const componentTypeSelect = document.getElementById("componentType")
-const serialProductSelect = document.getElementById("serialProduct")
-const serialCode = document.getElementById("serialCode")
-const serialForm = document.getElementById("serialForm")
-const serialMessage = document.getElementById("serialMessage")
+const componentTypeSelect = document.getElementById("componentType");
+const serialProductSelect = document.getElementById("serialProduct");
+const serialCode = document.getElementById("serialCode");
+const serialForm = document.getElementById("serialForm");
+const serialMessage = document.getElementById("serialMessage");
 
 // Elementos para productos
-const addProductBtn = document.getElementById("addProductBtn")
-const productModal = document.getElementById("productModal")
-const closeProductModal = document.getElementById("closeProductModal")
-const productForm = document.getElementById("productForm")
-const productMessage = document.getElementById("productMessage")
-const productTypeSelect = document.getElementById("productType")
+const addProductBtn = document.getElementById("addProductBtn");
+const productModal = document.getElementById("productModal");
+const closeProductModal = document.getElementById("closeProductModal");
+const productForm = document.getElementById("productForm");
+const productMessage = document.getElementById("productMessage");
+const productTypeSelect = document.getElementById("productType");
 
 // Elementos comunes
-const addItemBtn = document.getElementById("addItemBtn")
-const itemModal = document.getElementById("itemModal")
-const closeModal = document.getElementById("closeModal")
-const searchInput = document.getElementById("searchInput")
-const searchBtn = document.getElementById("searchBtn")
+const addItemBtn = document.getElementById("addItemBtn");
+const itemModal = document.getElementById("itemModal");
+const closeModal = document.getElementById("closeModal");
+const searchInput = document.getElementById("searchInput");
+const searchBtn = document.getElementById("searchBtn");
 
-const serialsDetailModal = document.getElementById("serialsDetailModal")
-const closeSerialsModal = document.getElementById("closeSerialsModal")
-const serialsModalTitle = document.getElementById("serialsModalTitle")
-const serialsTableBody = document.getElementById("serialsTableBody")
+const serialsDetailModal = document.getElementById("serialsDetailModal");
+const closeSerialsModal = document.getElementById("closeSerialsModal");
+const serialsModalTitle = document.getElementById("serialsModalTitle");
+const serialsTableBody = document.getElementById("serialsTableBody");
 
 // ====================================================================
 // VARIABLES GLOBALES OPTIMIZADAS
 // ====================================================================
-let currentUser = null
-let ALL_PRODUCT_MODELS = []
-let productTypesCache = null
-let inventoryCache = null
-let sessionCheckerInterval = null
+let currentUser = null;
+let ALL_PRODUCT_MODELS = [];
+let productTypesCache = null;
+let inventoryCache = null;
+let sessionCheckerInterval = null;
 
 // ====================================================================
 // MANEJO SEGURO DE AUTENTICACIÓN
@@ -716,6 +716,3 @@ document.addEventListener("DOMContentLoaded", async () => {
     
     console.log("✅ Sistema de inventario seguro inicializado");
 });
-   
- / /   V e r s i o n :   1 0 / 1 6 / 2 0 2 5   1 7 : 3 2 : 1 6  
- 

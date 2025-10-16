@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>InventarioPro - Gestión de Seriales</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="/static/styles.css"> 
+</head>
+<body>
+    <div class="login-container" id="loginContainer">
+        <div class="login-card">
+            <h1><i class="fas fa-box"></i> Soluciones Logicas</h1>
+            <p>Gestión de Seriales</p>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="username">Usuario</label>
+                    <input type="text" id="username" class="form-control" placeholder="Ingresa tu usuario" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Contraseña</label>
+                    <input type="password" id="password" class="form-control" placeholder="Ingresa tu contraseña" required>
+                </div>
+                <button type="submit" class="btn btn-block">
+                    <i class="fas fa-sign-in-alt"></i> Iniciar Sesión
+                </button>
+                <div id="loginError" class="alert alert-danger" style="display: none;">
+                    Usuario o contraseña incorrectos
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="dashboard" id="dashboard">
+        <header class="header">
+            <h1><i class="fas fa-box"></i> SolucionesLogicas</h1>
+            <div class="user-info">
+                <div class="user-avatar" id="userInitial">A</div>
+                <span id="userName">Usuario</span>
+                <button class="logout-btn" id="logoutBtn">
+                    <i class="fas fa-sign-out-alt"></i> Salir
+                </button>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <div class="container">
+                <div class="page-title">
+                    <h1>Gestión de Inventario (Seriales)</h1>
+                    <div class="header-buttons">
+                        <button class="btn" id="addItemBtn">
+                            <i class="fas fa-plus"></i> Ingreso de Serial
+                        </button>
+                        <button class="btn btn-success" id="addProductBtn">
+                            <i class="fas fa-cube"></i> Agregar Producto
+                        </button>
+                    </div>
+                </div>
+
+                <div class="stats">
+                    <div class="stat-card"><div class="stat-value" id="totalItems">0</div><div class="stat-label">Total de Modelos</div></div>
+                    <div class="stat-card"><div class="stat-value" id="lowStockItems">0</div><div class="stat-label">Stock Bajo/Cero</div></div>
+                    <div class="stat-card"><div class="stat-value" id="totalValue">0</div><div class="stat-label">Total de Seriales</div></div>
+                </div>
+
+                <div class="card">
+                    <div class="search-bar">
+                        <input type="text" id="searchInput" class="form-control" placeholder="Buscar por Modelo o SKU...">
+                        <button class="btn" id="searchBtn"><i class="fas fa-search"></i> Buscar</button>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table id="inventoryTable">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Modelo/Nombre</th>
+                                    <th>Tipo de Pieza</th>
+                                    <th>SKU</th>
+                                    <th>Stock</th>
+                                    <th>Estado</th>
+                                    <th>Historial de Actividad</th> 
+                                </tr>
+                            </thead>
+                            <tbody id="inventoryTableBody">
+                                <tr>
+                                    <td colspan="7" style="text-align: center; padding: 40px;"><div class="loading"></div> Cargando inventario...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal: Agregar Serial -->
+    <div class="modal" id="itemModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Ingresar Nuevo Serial</h2>
+                <button class="close-btn" id="closeModal">&times;</button>
+            </div>
+            <form id="serialForm">
+                <div class="form-group">
+                    <label for="componentType">Tipo de Componente</label>
+                    <select id="componentType" class="form-control" required>
+                        <option value="">-- Selecciona un Tipo --</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="serialProduct">Modelo Específico</label>
+                    <select id="serialProduct" class="form-control" required disabled>
+                        <option value="">-- Selecciona un Modelo (Selecciona Tipo primero) --</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="serialCode">Código Único de Serial</label>
+                    <input type="text" id="serialCode" class="form-control" placeholder="SN-DS8K-0001" required>
+                </div>
+                
+                <button type="submit" class="btn btn-block" id="saveSerialBtn">
+                    <i class="fas fa-save"></i> Registrar Serial
+                </button>
+                
+                <div id="serialMessage" class="alert" style="display: none;"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Agregar Producto -->
+    <div class="modal" id="productModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Agregar Nuevo Producto</h2>
+                <button class="close-btn" id="closeProductModal">&times;</button>
+            </div>
+            <form id="productForm">
+                <div class="form-group">
+                    <label for="productName">Nombre del Producto</label>
+                    <input type="text" id="productName" class="form-control" placeholder="Ej: Lenovo ThinkPad T14" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="productDescription">Descripción</label>
+                    <textarea id="productDescription" class="form-control" placeholder="Descripción del producto..." rows="3"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="productType">Tipo de Componente</label>
+                    <select id="productType" class="form-control" required>
+                        <option value="">-- Selecciona un Tipo --</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="productSKU">Código SKU</label>
+                    <input type="text" id="productSKU" class="form-control" placeholder="Ej: SKU-LAP-LEN-T14" required>
+                </div>
+                
+                <button type="submit" class="btn btn-block">
+                    <i class="fas fa-save"></i> Guardar Producto
+                </button>
+                
+                <div id="productMessage" class="alert" style="display: none;"></div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Modal: Ver Seriales -->
+    <div class="modal" id="serialsDetailModal">
+        <div class="modal-content" style="max-width: 800px;">
+            <div class="modal-header">
+                <h2 id="serialsModalTitle">Seriales en Almacén</h2>
+                <button class="close-btn" id="closeSerialsModal">&times;</button>
+            </div>
+            <div style="padding: 25px;">
+                <p style="margin-bottom: 20px; color: #666;">Lista de seriales por modelo con su última actividad registrada.</p>
+                <div class="table-responsive">
+                    <table id="serialsTable">
+                        <thead>
+                            <tr>
+                                <th>Serial ID</th>
+                                <th>Código de Serial</th>
+                                <th>Estado Actual</th>
+                                <th>Última Actividad</th>
+                                <th>Ver Historial</th>
+                            </tr>
+                        </thead>
+                        <tbody id="serialsTableBody">
+                            <tr>
+                                <td colspan="5" style="text-align: center;">Cargando...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

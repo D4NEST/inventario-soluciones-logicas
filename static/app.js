@@ -716,3 +716,5 @@ document.addEventListener("DOMContentLoaded", async () => {
     
     console.log("✅ Sistema de inventario seguro inicializado");
 });
+   
+ 

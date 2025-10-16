@@ -1,7 +1,7 @@
 // ====================================================================
 // CONFIGURACIÓN SEGURA
 // ====================================================================
-const API_BASE_URL = "http://127.0.0.1:5000/api"
+const API_BASE_URL = "https://inventario-soluciones-logicas-production.up.railway.app/"
 const AUTH_URL = `${API_BASE_URL}/auth`
 const INVENTARIO_URL = `${API_BASE_URL}/inventario`
 

@@ -30,7 +30,7 @@ app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=8)
 # CORS CONFIGURACIÓN MEJORADA
 CORS(app, 
      supports_credentials=True,
-     origins=['http://localhost:5000', 'http://127.0.0.1:5000'],
+     origins=['https://inventario-soluciones-logicas-production.up.railway.app', 'http://localhost:5000', 'http://127.0.0.1:5000'],
      methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
      allow_headers=['Content-Type', 'Authorization', 'X-Requested-With'],
      expose_headers=['Set-Cookie'])

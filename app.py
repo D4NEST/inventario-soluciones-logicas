@@ -41,13 +41,15 @@ CORS(app,
      allow_headers=['Content-Type', 'Authorization', 'X-Requested-With'],
      expose_headers=['Set-Cookie'])
 
-# --- CONFIGURACIÓN DE BASE DE DATOS CORREGIDA ---
-DB_HOST = os.environ.get('DB_HOST', 'aws-1-sa-east-1.pooler.supabase.com')
-DB_PORT = os.environ.get('DB_PORT', '6543')  # 👈 PUERTO 6543 PARA POOLING
-DB_NAME = os.environ.get('DB_NAME', 'postgres')
-DB_USER = os.environ.get('DB_USER', 'postgres.kdcbwnqqqbdcbvjwpzgw')  # 👈 USUARIO CON .project_ref
-DB_PASS = os.environ.get('DB_PASS', '253672145415412')
+# --- CONFIGURACIÓN DE BASE DE DATOS CON DEBUG ---
+DB_HOST = os.environ.get('DB_HOST') or 'aws-1-sa-east-1.pooler.supabase.com'
+DB_PORT = os.environ.get('DB_PORT') or '6543'
+DB_NAME = os.environ.get('DB_NAME') or 'postgres'
+DB_USER = os.environ.get('DB_USER') or 'postgres.kdcbwnqqqbdcbvjwpzgw'
+DB_PASS = os.environ.get('DB_PASS') or '253672145415412'
 
+# 🔍 DEBUG: Verificar variables
+print(f"🔧 DEBUG VARIABLES - Host: {DB_HOST}, Port: {DB_PORT}, User: {DB_USER}, DB: {DB_NAME}")
 def get_db_connection():
     """Establece la conexión con la base de datos usando psycopg2."""
     try:

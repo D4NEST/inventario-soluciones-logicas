@@ -42,10 +42,10 @@ CORS(app,
      expose_headers=['Set-Cookie'])
 
 # --- CONFIGURACIÓN DE BASE DE DATOS CON DEBUG ---
-DB_HOST = os.environ.get('DB_HOST') or 'aws-1-sa-east-1.pooler.supabase.com'
-DB_PORT = os.environ.get('DB_PORT') or '6543'
+DB_HOST = os.environ.get('DB_HOST') or 'db.kdcbwnqqqbdcbvjwpzgw.supabase.co'
+DB_PORT = os.environ.get('DB_PORT') or '5432'
 DB_NAME = os.environ.get('DB_NAME') or 'postgres'
-DB_USER = os.environ.get('DB_USER') or 'postgres.kdcbwnqqqbdcbvjwpzgw'
+DB_USER = os.environ.get('DB_USER') or 'postgres'
 DB_PASS = os.environ.get('DB_PASS') or '253672145415412'
 
 # 🔍 DEBUG: Verificar variables

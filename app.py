@@ -51,17 +51,20 @@ DB_PASS = os.environ.get('DB_PASS')
 def get_db_connection():
     """Establece la conexión con la base de datos usando psycopg2."""
     try:
+        print(f"🔍 CONEXIÓN BD - Host: {DB_HOST}:{DB_PORT}, User: {DB_USER}, DB: {DB_NAME}")
+        
         conn = psycopg2.connect(
             host=DB_HOST,
             database=DB_NAME,
             user=DB_USER,
             password=DB_PASS,
             port=DB_PORT,
-            connect_timeout=10
+            connect_timeout=30
         )
+        print("✅ CONEXIÓN A BD EXITOSA!")
         return conn
     except Exception as e:
-        print(f"❌ Error de conexión a la base de datos: {e}")
+        print(f"❌ ERROR CONEXIÓN BD: {str(e)}")
         return None
 
 # ------------------------------------------------------------------

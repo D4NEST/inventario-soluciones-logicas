@@ -41,12 +41,12 @@ CORS(app,
      allow_headers=['Content-Type', 'Authorization', 'X-Requested-With'],
      expose_headers=['Set-Cookie'])
 
-# --- CONFIGURACIÓN DE BASE DE DATOS ---
-DB_HOST = os.environ.get('DB_HOST')
-DB_PORT = os.environ.get('DB_PORT', '5432')
-DB_NAME = os.environ.get('DB_NAME')
-DB_USER = os.environ.get('DB_USER')
-DB_PASS = os.environ.get('DB_PASS')
+# --- CONFIGURACIÓN DE BASE DE DATOS CORREGIDA ---
+DB_HOST = os.environ.get('DB_HOST', 'aws-1-sa-east-1.pooler.supabase.com')
+DB_PORT = os.environ.get('DB_PORT', '6543')  # 👈 PUERTO 6543 PARA POOLING
+DB_NAME = os.environ.get('DB_NAME', 'postgres')
+DB_USER = os.environ.get('DB_USER', 'postgres.kdcbwnqqqbdcbvjwpzgw')  # 👈 USUARIO CON .project_ref
+DB_PASS = os.environ.get('DB_PASS', '253672145415412')
 
 def get_db_connection():
     """Establece la conexión con la base de datos usando psycopg2."""
@@ -59,7 +59,8 @@ def get_db_connection():
             user=DB_USER,
             password=DB_PASS,
             port=DB_PORT,
-            connect_timeout=30
+            connect_timeout=30,
+            sslmode='require'  # 👈 SSL OBLIGATORIO PARA SUPABASE
         )
         print("✅ CONEXIÓN A BD EXITOSA!")
         return conn

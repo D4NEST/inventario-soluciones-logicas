@@ -130,38 +130,87 @@ function animateDashboardLogo() {
     }
 }
 
-// Animación cuando se muestra el dashboard después del login - CORREGIDA
+// ====================================================================
+// FUNCIONES DE TRANSICIÓN MEJORADAS - CORREGIDAS
+// ====================================================================
+
+/**
+ * Transición suave de Login a Dashboard - CORREGIDA
+ */
 function showDashboardWithAnimation() {
-    // Animación de transición entre pantallas
+    // Primero preparar el dashboard (oculto pero en el DOM)
+    dashboardScreen.style.opacity = '0';
+    dashboardScreen.style.display = 'flex';
+    
+    // Animación coordinada
     const timeline = anime.timeline({
         duration: 800,
-        easing: 'easeInOutQuad'
+        easing: 'easeInOutQuad',
+        complete: function() {
+            // Limpiar estilos inline después de la animación
+            loginScreen.style.display = 'none';
+            dashboardScreen.style.opacity = '';
+        }
     });
 
     timeline
     .add({
-        targets: '#loginScreen',
+        targets: loginScreen,
         opacity: [1, 0],
-        translateY: [0, -50],
-        duration: 500,
+        translateY: [0, -20],
+        duration: 400,
         complete: function() {
             loginScreen.classList.remove('active');
-            dashboardScreen.classList.add('active');
         }
     })
     .add({
-        targets: '#dashboardScreen',
+        targets: dashboardScreen,
         opacity: [0, 1],
-        translateY: [50, 0],
-        duration: 600
+        translateY: [20, 0],
+        duration: 500,
+        begin: function() {
+            dashboardScreen.classList.add('active');
+        }
+    });
+}
+
+/**
+ * Transición suave de Dashboard a Login - CORREGIDA  
+ */
+function showLoginWithAnimation() {
+    // Primero preparar el login (oculto pero en el DOM)
+    loginScreen.style.opacity = '0';
+    loginScreen.style.display = 'flex';
+    
+    const timeline = anime.timeline({
+        duration: 800,
+        easing: 'easeInOutQuad',
+        complete: function() {
+            // Limpiar estilos inline después de la animación
+            dashboardScreen.style.display = 'none';
+            loginScreen.style.opacity = '';
+        }
+    });
+
+    timeline
+    .add({
+        targets: dashboardScreen,
+        opacity: [1, 0],
+        translateY: [0, 20],
+        duration: 400,
+        complete: function() {
+            dashboardScreen.classList.remove('active');
+        }
     })
     .add({
-        targets: '#dashboardLogo',
-        scale: [0.8, 1],
-        rotate: '5deg',
-        duration: 800,
-        easing: 'easeOutBack'
-    }, '-=400');
+        targets: loginScreen,
+        opacity: [0, 1],
+        translateY: [-20, 0],
+        duration: 500,
+        begin: function() {
+            loginScreen.classList.add('active');
+        }
+    });
 }
 
 // Animación sutil al hacer hover en el logo
@@ -194,7 +243,7 @@ function setupLogoHoverAnimations() {
 // ====================================================================
 
 /**
- * Login seguro - COMPLETAMENTE CORREGIDO
+ * Login seguro - ACTUALIZADO con transición mejorada
  */
 async function secureLogin(username, password) {
     try {
@@ -220,16 +269,17 @@ async function secureLogin(username, password) {
             userInitial.textContent = currentUser.name.charAt(0);
             userName.textContent = currentUser.name;
 
-            // CORRECCIÓN PRINCIPAL: Usar animación para transición
+            // USAR LA NUEVA TRANSICIÓN MEJORADA
             showDashboardWithAnimation();
             
             loginError.style.display = "none";
 
-            // Cargar datos del dashboard
+            // Cargar datos del dashboard después de la transición
             setTimeout(() => {
                 loadInventoryData();
                 loadComponentTypes();
-            }, 1000);
+                animateDashboardLogo();
+            }, 600);
             
             startSessionChecker();
         } else {
@@ -270,7 +320,7 @@ async function checkSession() {
 }
 
 /**
- * Logout seguro - CORREGIDO
+ * Logout seguro - ACTUALIZADO con transición mejorada
  */
 async function secureLogout() {
     try {
@@ -287,43 +337,16 @@ async function secureLogout() {
         inventoryCache = null;
         selectedSerials.clear();
         
-        // Animación de salida CORREGIDA
-        const timeline = anime.timeline({
-            duration: 800,
-            easing: 'easeInOutQuad'
-        });
-
-        timeline
-        .add({
-            targets: '#dashboardScreen',
-            opacity: [1, 0],
-            translateY: [0, 50],
-            duration: 500,
-            complete: function() {
-                dashboardScreen.classList.remove('active');
-                loginScreen.classList.add('active');
-            }
-        })
-        .add({
-            targets: '#loginScreen',
-            opacity: [0, 1],
-            translateY: [-50, 0],
-            duration: 600
-        })
-        .add({
-            targets: '.login-form',
-            opacity: [0, 1],
-            translateY: [20, 0],
-            duration: 400
-        });
-        
-        // Reiniciar animación del login
-        setTimeout(() => {
-            runLoginAnimation();
-        }, 1000);
+        // USAR LA NUEVA TRANSICIÓN MEJORADA
+        showLoginWithAnimation();
         
         loginForm.reset();
         loginError.style.display = "none";
+        
+        // Reiniciar animación del login después de la transición
+        setTimeout(() => {
+            runLoginAnimation();
+        }, 600);
         
         stopSessionChecker();
     }
@@ -1328,12 +1351,16 @@ searchInput.addEventListener("input", (e) => {
 });
 
 // ====================================================================
-// INICIALIZACIÓN SEGURA - COMPLETAMENTE CORREGIDA
+// INICIALIZACIÓN SEGURA - ACTUALIZADA
 // ====================================================================
 document.addEventListener("DOMContentLoaded", async () => {
     // Asegurar que solo el login esté visible inicialmente
     loginScreen.classList.add('active');
     dashboardScreen.classList.remove('active');
+    
+    // Asegurar display correcto
+    loginScreen.style.display = 'flex';
+    dashboardScreen.style.display = 'none';
     
     // Inicializar animaciones
     initializeAnimations();
@@ -1343,9 +1370,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     const hasSession = await checkSession();
     
     if (hasSession && currentUser) {
-        // Si hay sesión, mostrar dashboard directamente
+        // Si hay sesión, mostrar dashboard directamente SIN animación
         loginScreen.classList.remove('active');
+        loginScreen.style.display = 'none';
         dashboardScreen.classList.add('active');
+        dashboardScreen.style.display = 'flex';
         
         // Cargar datos del dashboard
         loadInventoryData();
@@ -1354,7 +1383,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     } else {
         // Si no hay sesión, asegurar que solo el login esté visible
         loginScreen.classList.add('active');
+        loginScreen.style.display = 'flex';
         dashboardScreen.classList.remove('active');
+        dashboardScreen.style.display = 'none';
     }
     
     console.log("🚀 Sistema de inventario para Soluciones Lógicas inicializado correctamente");

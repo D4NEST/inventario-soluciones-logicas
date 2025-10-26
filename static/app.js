@@ -1,7 +1,7 @@
 // ====================================================================
 // CONFIGURACIÓN SEGURA - USAR MISMO DOMINIO
 // ====================================================================
-const API_BASE_URL = window.location.origin; // Usar el origen actual dinámicamente
+const API_BASE_URL = window.location.origin;
 const AUTH_URL = `${API_BASE_URL}/api/auth`;
 const INVENTARIO_URL = `${API_BASE_URL}/api/inventario`;
 
@@ -78,18 +78,16 @@ let currentSerialId = null;
 let selectedSerials = new Set();
 
 // ====================================================================
-// ANIMACIONES DEL LOGO - INTEGRADAS Y CORREGIDAS
+// ANIMACIONES DEL LOGO - SIMPLIFICADAS
 // ====================================================================
 
 function initializeAnimations() {
-    // Solo ejecutar animaciones si estamos en la pantalla de login
-    if (loginScreen.classList.contains('active')) {
+    if (loginScreen.style.display !== 'none') {
         runLoginAnimation();
     }
 }
 
 function runLoginAnimation() {
-    // Timeline para animación coordinada
     const timeline = anime.timeline({
         duration: 1200,
         easing: 'easeOutElastic(1, .8)'
@@ -130,71 +128,12 @@ function animateDashboardLogo() {
     }
 }
 
-// Animación cuando se muestra el dashboard después del login - CORREGIDA
-function showDashboardWithAnimation() {
-    // Animación de transición entre pantallas
-    const timeline = anime.timeline({
-        duration: 800,
-        easing: 'easeInOutQuad'
-    });
-
-    timeline
-    .add({
-        targets: '#loginScreen',
-        opacity: [1, 0],
-        translateY: [0, -50],
-        duration: 500,
-        complete: function() {
-            loginScreen.classList.remove('active');
-            dashboardScreen.classList.add('active');
-        }
-    })
-    .add({
-        targets: '#dashboardScreen',
-        opacity: [0, 1],
-        translateY: [50, 0],
-        duration: 600
-    })
-    .add({
-        targets: '#dashboardLogo',
-        scale: [0.8, 1],
-        rotate: '5deg',
-        duration: 800,
-        easing: 'easeOutBack'
-    }, '-=400');
-}
-
-// Animación sutil al hacer hover en el logo
-function setupLogoHoverAnimations() {
-    document.addEventListener('mouseover', function(e) {
-        if (e.target.classList.contains('logo')) {
-            anime({
-                targets: e.target,
-                scale: 1.05,
-                duration: 300,
-                easing: 'easeOutQuad'
-            });
-        }
-    });
-
-    document.addEventListener('mouseout', function(e) {
-        if (e.target.classList.contains('logo')) {
-            anime({
-                targets: e.target,
-                scale: 1,
-                duration: 300,
-                easing: 'easeOutQuad'
-            });
-        }
-    });
-}
-
 // ====================================================================
-// MANEJO SEGURO DE AUTENTICACIÓN - CORREGIDO
+// MANEJO SEGURO DE AUTENTICACIÓN - COMPLETAMENTE CORREGIDO
 // ====================================================================
 
 /**
- * Login seguro - COMPLETAMENTE CORREGIDO
+ * Login seguro - CORREGIDO PARA OCULTAR COMPLETAMENTE EL LOGIN
  */
 async function secureLogin(username, password) {
     try {
@@ -220,16 +159,16 @@ async function secureLogin(username, password) {
             userInitial.textContent = currentUser.name.charAt(0);
             userName.textContent = currentUser.name;
 
-            // CORRECCIÓN PRINCIPAL: Usar animación para transición
-            showDashboardWithAnimation();
+            // ✅ CORRECCIÓN PRINCIPAL: OCULTAR COMPLETAMENTE LOGIN Y MOSTRAR DASHBOARD
+            hideLoginAndShowDashboard();
             
             loginError.style.display = "none";
 
-            // Cargar datos del dashboard
+            // Cargar datos del dashboard inmediatamente
             setTimeout(() => {
                 loadInventoryData();
                 loadComponentTypes();
-            }, 1000);
+            }, 500);
             
             startSessionChecker();
         } else {
@@ -247,7 +186,78 @@ async function secureLogin(username, password) {
 }
 
 /**
- * Verificar sesión activa
+ * ✅ FUNCIÓN NUEVA: Oculta login completamente y muestra dashboard
+ */
+function hideLoginAndShowDashboard() {
+    // Animación de salida del login
+    anime({
+        targets: loginScreen,
+        opacity: [1, 0],
+        scale: [1, 0.9],
+        duration: 500,
+        easing: 'easeInQuad',
+        complete: function() {
+            // OCULTAR COMPLETAMENTE el login
+            loginScreen.style.display = 'none';
+            loginScreen.classList.remove('active');
+            
+            // MOSTRAR el dashboard
+            dashboardScreen.style.display = 'block';
+            dashboardScreen.classList.add('active');
+            
+            // Animación de entrada del dashboard
+            anime({
+                targets: dashboardScreen,
+                opacity: [0, 1],
+                scale: [0.95, 1],
+                duration: 600,
+                easing: 'easeOutBack'
+            });
+            
+            animateDashboardLogo();
+        }
+    });
+}
+
+/**
+ * ✅ FUNCIÓN NUEVA: Oculta dashboard y muestra login
+ */
+function hideDashboardAndShowLogin() {
+    // Animación de salida del dashboard
+    anime({
+        targets: dashboardScreen,
+        opacity: [1, 0],
+        scale: [1, 0.9],
+        duration: 500,
+        easing: 'easeInQuad',
+        complete: function() {
+            // OCULTAR COMPLETAMENTE el dashboard
+            dashboardScreen.style.display = 'none';
+            dashboardScreen.classList.remove('active');
+            
+            // MOSTRAR el login
+            loginScreen.style.display = 'flex';
+            loginScreen.classList.add('active');
+            
+            // Animación de entrada del login
+            anime({
+                targets: loginScreen,
+                opacity: [0, 1],
+                scale: [0.95, 1],
+                duration: 600,
+                easing: 'easeOutBack'
+            });
+            
+            // Reiniciar animación del login
+            setTimeout(() => {
+                runLoginAnimation();
+            }, 300);
+        }
+    });
+}
+
+/**
+ * Verificar sesión activa - MEJORADO
  */
 async function checkSession() {
     try {
@@ -287,40 +297,8 @@ async function secureLogout() {
         inventoryCache = null;
         selectedSerials.clear();
         
-        // Animación de salida CORREGIDA
-        const timeline = anime.timeline({
-            duration: 800,
-            easing: 'easeInOutQuad'
-        });
-
-        timeline
-        .add({
-            targets: '#dashboardScreen',
-            opacity: [1, 0],
-            translateY: [0, 50],
-            duration: 500,
-            complete: function() {
-                dashboardScreen.classList.remove('active');
-                loginScreen.classList.add('active');
-            }
-        })
-        .add({
-            targets: '#loginScreen',
-            opacity: [0, 1],
-            translateY: [-50, 0],
-            duration: 600
-        })
-        .add({
-            targets: '.login-form',
-            opacity: [0, 1],
-            translateY: [20, 0],
-            duration: 400
-        });
-        
-        // Reiniciar animación del login
-        setTimeout(() => {
-            runLoginAnimation();
-        }, 1000);
+        // Usar la nueva función para ocultar dashboard y mostrar login
+        hideDashboardAndShowLogin();
         
         loginForm.reset();
         loginError.style.display = "none";
@@ -339,7 +317,7 @@ function startSessionChecker() {
             alert("Sesión expirada. Por favor ingresa nuevamente.");
             secureLogout();
         }
-    }, 5 * 60 * 1000); // 5 minutos
+    }, 5 * 60 * 1000);
 }
 
 function stopSessionChecker() {
@@ -386,7 +364,6 @@ function showLoginError(message) {
     loginError.textContent = message;
     loginError.style.display = "block";
     
-    // Animación de error
     anime({
         targets: '#loginError',
         scale: [0.8, 1],
@@ -404,7 +381,6 @@ function showLoginError(message) {
  */
 async function loadInventoryData(filter = "") {
     try {
-        // Mostrar animación de carga
         inventoryTableBody.innerHTML = `
             <tr>
                 <td colspan="8" style="text-align: center; padding: 40px;">
@@ -413,7 +389,6 @@ async function loadInventoryData(filter = "") {
             </tr>
         `;
 
-        // Cargar inventario y estadísticas EN PARALELO
         const [inventoryResponse, statsResponse] = await Promise.all([
             secureFetch(`${INVENTARIO_URL}/stock`),
             secureFetch(`${INVENTARIO_URL}/estadisticas`)
@@ -427,7 +402,6 @@ async function loadInventoryData(filter = "") {
         inventoryCache = data;
         renderInventoryTable(data, filter);
 
-        // Actualizar estadísticas si la respuesta fue exitosa
         if (statsResponse.ok) {
             const stats = await statsResponse.json();
             updateStatistics(
@@ -436,7 +410,6 @@ async function loadInventoryData(filter = "") {
                 stats.total_seriales || 0
             );
         } else {
-            // Si falla stats, calcular desde los datos
             updateStatisticsFromData(data);
         }
 
@@ -529,7 +502,6 @@ function renderInventoryTable(data, filter = "") {
 
         inventoryTableBody.appendChild(row);
         
-        // Animación de aparición escalonada
         anime({
             targets: row,
             opacity: [0, 1],
@@ -590,10 +562,8 @@ async function loadComponentTypes() {
 
         const types = await response.json();
         
-        // Si no hay tipos, inicializar automáticamente
         if (types.length === 0) {
             await inicializarTiposPredeterminados();
-            // Recargar tipos
             const newResponse = await secureFetch(`${INVENTARIO_URL}/tipos_pieza`);
             const newTypes = await newResponse.json();
             productTypesCache = newTypes;
@@ -697,7 +667,6 @@ async function showSerialsDetail(productoId, productoNombre) {
     selectedSerials.clear();
     updateActionButtons();
 
-    // Animación de entrada del modal
     anime({
         targets: serialsDetailModal,
         opacity: [0, 1],
@@ -743,7 +712,6 @@ function renderSerialsTable(serials, productoNombre) {
         return;
     }
 
-    // Contadores por estado
     const contadores = {
         ALMACEN: 0,
         INSTALADO: 0,
@@ -757,7 +725,6 @@ function renderSerialsTable(serials, productoNombre) {
         const row = document.createElement("tr");
         row.className = `serial-row ${s.estado.toLowerCase()}`;
         
-        // Iconos por estado
         const estadoIconos = {
             'ALMACEN': '🟢',
             'INSTALADO': '🔵', 
@@ -794,7 +761,6 @@ function renderSerialsTable(serials, productoNombre) {
 
         serialsTableBody.appendChild(row);
         
-        // Animación de entrada escalonada
         anime({
             targets: row,
             opacity: [0, 1],
@@ -805,7 +771,6 @@ function renderSerialsTable(serials, productoNombre) {
         });
     });
 
-    // Actualizar título con contadores
     serialsModalTitle.innerHTML = `
         <i class="fas fa-boxes"></i> ${productoNombre}
         <small style="display: block; font-size: 14px; color: var(--color-text-secondary); margin-top: 5px;">
@@ -820,7 +785,6 @@ function renderSerialsTable(serials, productoNombre) {
  * Asigna eventos a los botones de acción de seriales
  */
 function attachSerialActionEvents() {
-    // Botones de cambiar estado
     document.querySelectorAll(".change-status").forEach((btn) => {
         btn.addEventListener("click", function () {
             const serialId = this.getAttribute("data-serial-id");
@@ -829,7 +793,6 @@ function attachSerialActionEvents() {
         });
     });
 
-    // Botones de eliminar (solo admin)
     if (currentUser?.role === 'admin') {
         document.querySelectorAll(".delete-serial").forEach((btn) => {
             btn.addEventListener("click", function () {
@@ -852,7 +815,6 @@ function showChangeStatusModal(serialId, currentStatus) {
     
     changeStatusModal.style.display = "flex";
     
-    // Animación de entrada
     anime({
         targets: changeStatusModal,
         opacity: [0, 1],
@@ -889,7 +851,6 @@ confirmStatusChange.addEventListener("click", async () => {
         if (response.ok) {
             showMessage(statusMessage, `✅ ${result.mensaje}`, "success");
             
-            // Animación de éxito
             anime({
                 targets: statusMessage,
                 scale: [0.8, 1],
@@ -897,7 +858,6 @@ confirmStatusChange.addEventListener("click", async () => {
                 easing: 'easeOutBack'
             });
             
-            // Recargar los seriales después de 1.5 segundos
             setTimeout(() => {
                 changeStatusModal.style.display = "none";
                 showSerialsDetail(currentProductId, serialsModalTitle.textContent.split(': ')[1]);
@@ -915,7 +875,6 @@ confirmStatusChange.addEventListener("click", async () => {
  * Cancela el cambio de estado
  */
 cancelStatusChange.addEventListener("click", () => {
-    // Animación de salida
     anime({
         targets: changeStatusModal,
         opacity: [1, 0],
@@ -950,7 +909,6 @@ async function deleteSerial(serialId) {
 
         if (response.ok) {
             alert(`✅ ${result.mensaje}`);
-            // Recargar los seriales
             showSerialsDetail(currentProductId, serialsModalTitle.textContent.split(': ')[1]);
         } else {
             alert(`❌ ${result.error}`);
@@ -1012,7 +970,6 @@ serialForm.addEventListener("submit", async (e) => {
             inventoryCache = null;
             loadInventoryData();
             
-            // Animación de éxito
             anime({
                 targets: serialMessage,
                 scale: [0.8, 1],
@@ -1046,7 +1003,6 @@ addProductBtn.addEventListener("click", () => {
     productMessage.style.display = "none";
     loadProductTypes();
     
-    // Animación de entrada
     anime({
         targets: productModal,
         opacity: [0, 1],
@@ -1071,10 +1027,8 @@ async function loadProductTypes() {
         
         const types = await response.json();
         
-        // Si no hay tipos, inicializar automáticamente
         if (types.length === 0) {
             await inicializarTiposPredeterminados();
-            // Recargar tipos
             const newResponse = await secureFetch(`${INVENTARIO_URL}/tipos_pieza`);
             const newTypes = await newResponse.json();
             productTypesCache = newTypes;
@@ -1162,7 +1116,6 @@ productForm.addEventListener("submit", async (e) => {
             loadInventoryData();
             loadComponentTypes();
             
-            // Animación de éxito
             anime({
                 targets: productMessage,
                 scale: [0.8, 1],
@@ -1216,7 +1169,6 @@ async function eliminarProducto(productoId, productoNombre) {
 // ====================================================================
 
 function updateStatistics(totalModelos, lowStockCount, totalSeriales) {
-    // Animación de contadores
     animateCounter(totalItems, totalModelos);
     animateCounter(lowStockItems, lowStockCount);
     animateCounter(totalValue, totalSeriales);
@@ -1254,7 +1206,6 @@ addItemBtn.addEventListener("click", () => {
     serialProductSelect.disabled = true;
     loadComponentTypes();
     
-    // Animación de entrada
     anime({
         targets: itemModal,
         opacity: [0, 1],
@@ -1264,7 +1215,6 @@ addItemBtn.addEventListener("click", () => {
     });
 });
 
-// Sugerir SKU cuando se escribe el nombre del producto
 productNameInput.addEventListener("input", function() {
     if (!productSKUInput.value) {
         const skuSugerido = sugerirSKU(this.value);
@@ -1274,7 +1224,6 @@ productNameInput.addEventListener("input", function() {
 
 componentTypeSelect.addEventListener('change', filterProductModels);
 
-// Función para cerrar modales con animación
 function closeModalWithAnimation(modal) {
     anime({
         targets: modal,
@@ -1331,33 +1280,60 @@ searchInput.addEventListener("input", (e) => {
 // INICIALIZACIÓN SEGURA - COMPLETAMENTE CORREGIDA
 // ====================================================================
 document.addEventListener("DOMContentLoaded", async () => {
-    // Asegurar que solo el login esté visible inicialmente
+    console.log("🚀 Inicializando aplicación...");
+    
+    // ✅ CONFIGURACIÓN INICIAL CORRECTA
+    loginScreen.style.display = 'flex';
     loginScreen.classList.add('active');
+    dashboardScreen.style.display = 'none';
     dashboardScreen.classList.remove('active');
     
-    // Inicializar animaciones
     initializeAnimations();
     setupLogoHoverAnimations();
     
-    // Verificar sesión existente
-    const hasSession = await checkSession();
-    
-    if (hasSession && currentUser) {
-        // Si hay sesión, mostrar dashboard directamente
-        loginScreen.classList.remove('active');
-        dashboardScreen.classList.add('active');
+    try {
+        // Verificar si hay sesión activa
+        const hasSession = await checkSession();
+        console.log("🔍 Sesión activa:", hasSession);
         
-        // Cargar datos del dashboard
-        loadInventoryData();
-        loadComponentTypes();
-        animateDashboardLogo();
-    } else {
-        // Si no hay sesión, asegurar que solo el login esté visible
+        if (hasSession && currentUser) {
+            console.log("✅ Usuario autenticado:", currentUser.name);
+            
+            // ✅ OCULTAR LOGIN COMPLETAMENTE Y MOSTRAR DASHBOARD
+            loginScreen.style.display = 'none';
+            loginScreen.classList.remove('active');
+            dashboardScreen.style.display = 'block';
+            dashboardScreen.classList.add('active');
+            
+            // Actualizar UI del usuario
+            userInitial.textContent = currentUser.name.charAt(0);
+            userName.textContent = currentUser.name;
+            
+            // Cargar datos del dashboard
+            await loadInventoryData();
+            await loadComponentTypes();
+            animateDashboardLogo();
+            
+            startSessionChecker();
+            
+        } else {
+            console.log("🔐 Mostrando pantalla de login");
+            // Asegurar que solo el login esté visible
+            loginScreen.style.display = 'flex';
+            loginScreen.classList.add('active');
+            dashboardScreen.style.display = 'none';
+            dashboardScreen.classList.remove('active');
+        }
+        
+    } catch (error) {
+        console.error("❌ Error en inicialización:", error);
+        // En caso de error, mostrar login
+        loginScreen.style.display = 'flex';
         loginScreen.classList.add('active');
-        dashboardScreen.classList.remove('active');
+        dashboardScreen.style.display = 'none';
     }
     
-    console.log("🚀 Sistema de inventario para Soluciones Lógicas inicializado correctamente");
+    console.log("✅ Sistema de inventario inicializado correctamente");
 });
 
 // Agregar estilos CSS dinámicos para mejor visualización
@@ -1424,7 +1400,6 @@ const dynamicStyles = `
     font-size: 13px;
 }
 
-/* Animaciones para modales */
 .modal {
     transition: opacity 0.3s ease;
 }
@@ -1444,7 +1419,6 @@ const dynamicStyles = `
     100% { transform: rotate(360deg); }
 }
 
-/* Estilos para el botón de login mejorado */
 .login-btn {
     width: 100%;
     padding: 18px 30px;
@@ -1493,7 +1467,45 @@ const dynamicStyles = `
     cursor: not-allowed;
     transform: none;
 }
+
+/* ✅ ESTILOS PARA GARANTIZAR QUE SOLO UNA PANTALLA SEA VISIBLE */
+#loginScreen, #dashboardScreen {
+    transition: all 0.5s ease;
+}
+
+#loginScreen:not(.active) {
+    display: none !important;
+}
+
+#dashboardScreen:not(.active) {
+    display: none !important;
+}
 </style>
 `;
 
 document.head.insertAdjacentHTML('beforeend', dynamicStyles);
+
+// Función para animaciones hover del logo
+function setupLogoHoverAnimations() {
+    document.addEventListener('mouseover', function(e) {
+        if (e.target.classList.contains('logo')) {
+            anime({
+                targets: e.target,
+                scale: 1.05,
+                duration: 300,
+                easing: 'easeOutQuad'
+            });
+        }
+    });
+
+    document.addEventListener('mouseout', function(e) {
+        if (e.target.classList.contains('logo')) {
+            anime({
+                targets: e.target,
+                scale: 1,
+                duration: 300,
+                easing: 'easeOutQuad'
+            });
+        }
+    });
+}

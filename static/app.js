@@ -78,6 +78,122 @@ let currentSerialId = null;
 let selectedSerials = new Set();
 
 // ====================================================================
+// ANIMACIONES DEL LOGO - INTEGRADAS
+// ====================================================================
+
+function initializeAnimations() {
+    // Animación para el login
+    const loginLogo = document.getElementById('animatedLogo');
+    if (loginLogo) {
+        runLoginAnimation();
+    }
+
+    // Animación para el dashboard (cuando se carga)
+    const dashboardLogo = document.getElementById('dashboardLogo');
+    if (dashboardLogo) {
+        animateDashboardLogo();
+    }
+}
+
+function runLoginAnimation() {
+    // Timeline para animación coordinada
+    const timeline = anime.timeline({
+        duration: 1200,
+        easing: 'easeOutElastic(1, .8)'
+    });
+
+    timeline
+    .add({
+        targets: '#animatedLogo',
+        scale: [0, 1.2, 1],
+        rotate: '360deg',
+        opacity: [0, 1],
+        duration: 1500,
+    })
+    .add({
+        targets: '.company-name',
+        opacity: [0, 1],
+        translateY: [20, 0],
+        duration: 800,
+    }, '-=500')
+    .add({
+        targets: '.login-form',
+        opacity: [0, 1],
+        translateY: [30, 0],
+        duration: 600,
+    }, '-=300');
+}
+
+function animateDashboardLogo() {
+    anime({
+        targets: '#dashboardLogo',
+        scale: [0.8, 1],
+        rotate: '5deg',
+        duration: 800,
+        easing: 'easeOutBack'
+    });
+}
+
+// Animación cuando se muestra el dashboard después del login
+function showDashboardWithAnimation() {
+    // Animación de transición entre pantallas
+    const timeline = anime.timeline({
+        duration: 800,
+        easing: 'easeInOutQuad'
+    });
+
+    timeline
+    .add({
+        targets: '#loginScreen',
+        opacity: [1, 0],
+        translateY: [0, -50],
+        duration: 500,
+        complete: function() {
+            document.getElementById('loginScreen').classList.remove('active');
+            document.getElementById('dashboardScreen').classList.add('active');
+        }
+    })
+    .add({
+        targets: '#dashboardScreen',
+        opacity: [0, 1],
+        translateY: [50, 0],
+        duration: 600
+    })
+    .add({
+        targets: '#dashboardLogo',
+        scale: [0.8, 1],
+        rotate: '5deg',
+        duration: 800,
+        easing: 'easeOutBack'
+    }, '-=400');
+}
+
+// Animación sutil al hacer hover en el logo
+function setupLogoHoverAnimations() {
+    document.addEventListener('mouseover', function(e) {
+        if (e.target.classList.contains('logo')) {
+            anime({
+                targets: e.target,
+                scale: 1.05,
+                duration: 300,
+                easing: 'easeOutQuad'
+            });
+        }
+    });
+
+    document.addEventListener('mouseout', function(e) {
+        if (e.target.classList.contains('logo')) {
+            anime({
+                targets: e.target,
+                scale: 1,
+                duration: 300,
+                easing: 'easeOutQuad'
+            });
+        }
+    });
+}
+
+// ====================================================================
 // MANEJO SEGURO DE AUTENTICACIÓN
 // ====================================================================
 
@@ -102,8 +218,8 @@ async function secureLogin(username, password) {
             userInitial.textContent = currentUser.name.charAt(0);
             userName.textContent = currentUser.name;
 
-            loginContainer.style.display = "none";
-            dashboard.style.display = "block";
+            // Usar animación para mostrar el dashboard
+            showDashboardWithAnimation();
             loginError.style.display = "none";
 
             loadInventoryData();
@@ -160,8 +276,21 @@ async function secureLogout() {
         inventoryCache = null;
         selectedSerials.clear();
         
-        dashboard.style.display = "none";
-        loginContainer.style.display = "flex";
+        // Animación de salida
+        anime({
+            targets: '#dashboardScreen',
+            opacity: [1, 0],
+            translateY: [0, 50],
+            duration: 500,
+            complete: function() {
+                document.getElementById('dashboardScreen').classList.remove('active');
+                document.getElementById('loginScreen').classList.add('active');
+                
+                // Reiniciar animación del login
+                runLoginAnimation();
+            }
+        });
+        
         loginForm.reset();
         loginError.style.display = "none";
         
@@ -225,6 +354,14 @@ logoutBtn.addEventListener("click", secureLogout);
 function showLoginError(message) {
     loginError.textContent = message;
     loginError.style.display = "block";
+    
+    // Animación de error
+    anime({
+        targets: '#loginError',
+        scale: [0.8, 1],
+        duration: 300,
+        easing: 'easeOutBack'
+    });
 }
 
 // ====================================================================
@@ -236,6 +373,15 @@ function showLoginError(message) {
  */
 async function loadInventoryData(filter = "") {
     try {
+        // Mostrar animación de carga
+        inventoryTableBody.innerHTML = `
+            <tr>
+                <td colspan="8" style="text-align: center; padding: 40px;">
+                    <div class="loading"></div> Cargando inventario...
+                </td>
+            </tr>
+        `;
+
         // Cargar inventario y estadísticas EN PARALELO
         const [inventoryResponse, statsResponse] = await Promise.all([
             secureFetch(`${INVENTARIO_URL}/stock`),
@@ -308,7 +454,7 @@ function renderInventoryTable(data, filter = "") {
     if (data.length === 0) {
         inventoryTableBody.innerHTML = `
             <tr>
-                <td colspan="7" style="text-align: center; padding: 40px;">
+                <td colspan="8" style="text-align: center; padding: 40px;">
                     <i class="fas fa-search" style="font-size: 24px; margin-bottom: 10px; display: block; color: var(--color-text-secondary);"></i>
                     No se encontraron productos que coincidan con la búsqueda.
                 </td>
@@ -318,7 +464,7 @@ function renderInventoryTable(data, filter = "") {
         return;
     }
 
-    data.forEach((item) => {
+    data.forEach((item, index) => {
         const row = document.createElement("tr");
         const stockStatus = item.stock_disponible <= 3 ? "Bajo" : item.stock_disponible === 0 ? "Agotado" : "Normal";
         const statusClass = item.stock_disponible <= 3 ? "danger" : item.stock_disponible === 0 ? "warning" : "success";
@@ -343,14 +489,24 @@ function renderInventoryTable(data, filter = "") {
             <td>
                 <span class="historial-text">${historialDesc}</span>
             </td>
-            <td>  <!-- NUEVA CELDA -->
-            <button class="btn-action btn-danger" onclick="eliminarProducto(${item.producto_id}, '${item.producto.replace(/'/g, "\\'")}')" title="Eliminar producto">
-            <i class="fas fa-trash"></i>
-        </button>
-    </td>
+            <td>
+                <button class="btn-action btn-danger" onclick="eliminarProducto(${item.producto_id}, '${item.producto.replace(/'/g, "\\'")}')" title="Eliminar producto">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
         `;
 
         inventoryTableBody.appendChild(row);
+        
+        // Animación de aparición escalonada
+        anime({
+            targets: row,
+            opacity: [0, 1],
+            translateY: [20, 0],
+            duration: 400,
+            delay: index * 50,
+            easing: 'easeOutQuad'
+        });
     });
 
     updateStatistics(data.length, lowStockCount, totalSeriales);
@@ -363,7 +519,7 @@ function renderInventoryTable(data, filter = "") {
 function showInventoryError() {
     inventoryTableBody.innerHTML = `
         <tr>
-            <td colspan="7" style="text-align: center; color: var(--color-danger); padding: 40px;">
+            <td colspan="8" style="text-align: center; color: var(--color-danger); padding: 40px;">
                 <i class="fas fa-exclamation-triangle" style="font-size: 24px; margin-bottom: 10px; display: block;"></i>
                 Error al conectar con el servidor. Verifica tu conexión.
             </td>
@@ -510,6 +666,15 @@ async function showSerialsDetail(productoId, productoNombre) {
     selectedSerials.clear();
     updateActionButtons();
 
+    // Animación de entrada del modal
+    anime({
+        targets: serialsDetailModal,
+        opacity: [0, 1],
+        scale: [0.9, 1],
+        duration: 400,
+        easing: 'easeOutBack'
+    });
+
     try {
         const response = await secureFetch(`${INVENTARIO_URL}/seriales/${productoId}`);
         if (!response.ok) throw new Error(`Error HTTP: ${response.status}`);
@@ -555,7 +720,7 @@ function renderSerialsTable(serials, productoNombre) {
         RETIRADO: 0
     };
 
-    serials.forEach((s) => {
+    serials.forEach((s, index) => {
         contadores[s.estado]++;
         
         const row = document.createElement("tr");
@@ -597,6 +762,16 @@ function renderSerialsTable(serials, productoNombre) {
         `;
 
         serialsTableBody.appendChild(row);
+        
+        // Animación de entrada escalonada
+        anime({
+            targets: row,
+            opacity: [0, 1],
+            translateX: [-20, 0],
+            duration: 300,
+            delay: index * 80,
+            easing: 'easeOutQuad'
+        });
     });
 
     // Actualizar título con contadores
@@ -645,6 +820,15 @@ function showChangeStatusModal(serialId, currentStatus) {
     statusMessage.style.display = "none";
     
     changeStatusModal.style.display = "flex";
+    
+    // Animación de entrada
+    anime({
+        targets: changeStatusModal,
+        opacity: [0, 1],
+        scale: [0.8, 1],
+        duration: 400,
+        easing: 'easeOutBack'
+    });
 }
 
 /**
@@ -674,6 +858,14 @@ confirmStatusChange.addEventListener("click", async () => {
         if (response.ok) {
             showMessage(statusMessage, `✅ ${result.mensaje}`, "success");
             
+            // Animación de éxito
+            anime({
+                targets: statusMessage,
+                scale: [0.8, 1],
+                duration: 300,
+                easing: 'easeOutBack'
+            });
+            
             // Recargar los seriales después de 1.5 segundos
             setTimeout(() => {
                 changeStatusModal.style.display = "none";
@@ -692,7 +884,17 @@ confirmStatusChange.addEventListener("click", async () => {
  * Cancela el cambio de estado
  */
 cancelStatusChange.addEventListener("click", () => {
-    changeStatusModal.style.display = "none";
+    // Animación de salida
+    anime({
+        targets: changeStatusModal,
+        opacity: [1, 0],
+        scale: [1, 0.8],
+        duration: 300,
+        easing: 'easeInQuad',
+        complete: function() {
+            changeStatusModal.style.display = "none";
+        }
+    });
 });
 
 /**
@@ -778,6 +980,15 @@ serialForm.addEventListener("submit", async (e) => {
             serialForm.reset();
             inventoryCache = null;
             loadInventoryData();
+            
+            // Animación de éxito
+            anime({
+                targets: serialMessage,
+                scale: [0.8, 1],
+                duration: 300,
+                easing: 'easeOutBack'
+            });
+            
             setTimeout(() => {
                 itemModal.style.display = "none";
                 serialMessage.style.display = "none";
@@ -803,6 +1014,15 @@ addProductBtn.addEventListener("click", () => {
     productForm.reset();
     productMessage.style.display = "none";
     loadProductTypes();
+    
+    // Animación de entrada
+    anime({
+        targets: productModal,
+        opacity: [0, 1],
+        scale: [0.9, 1],
+        duration: 400,
+        easing: 'easeOutBack'
+    });
 });
 
 /**
@@ -911,6 +1131,14 @@ productForm.addEventListener("submit", async (e) => {
             loadInventoryData();
             loadComponentTypes();
             
+            // Animación de éxito
+            anime({
+                targets: productMessage,
+                scale: [0.8, 1],
+                duration: 300,
+                easing: 'easeOutBack'
+            });
+            
             setTimeout(() => {
                 productModal.style.display = "none";
                 productMessage.style.display = "none";
@@ -957,9 +1185,23 @@ async function eliminarProducto(productoId, productoNombre) {
 // ====================================================================
 
 function updateStatistics(totalModelos, lowStockCount, totalSeriales) {
-    totalItems.textContent = totalModelos;
-    lowStockItems.textContent = lowStockCount;
-    totalValue.textContent = totalSeriales;
+    // Animación de contadores
+    animateCounter(totalItems, totalModelos);
+    animateCounter(lowStockItems, lowStockCount);
+    animateCounter(totalValue, totalSeriales);
+}
+
+function animateCounter(element, targetValue) {
+    const currentValue = parseInt(element.textContent) || 0;
+    anime({
+        targets: { value: currentValue },
+        value: targetValue,
+        duration: 800,
+        easing: 'easeOutQuad',
+        update: function(anim) {
+            element.textContent = Math.floor(anim.animations[0].currentValue);
+        }
+    });
 }
 
 function showMessage(element, message, type) {
@@ -980,6 +1222,15 @@ addItemBtn.addEventListener("click", () => {
     serialProductSelect.innerHTML = '<option value="">-- Selecciona un modelo (elige categoría primero) --</option>';
     serialProductSelect.disabled = true;
     loadComponentTypes();
+    
+    // Animación de entrada
+    anime({
+        targets: itemModal,
+        opacity: [0, 1],
+        scale: [0.9, 1],
+        duration: 400,
+        easing: 'easeOutBack'
+    });
 });
 
 // Sugerir SKU cuando se escribe el nombre del producto
@@ -992,27 +1243,41 @@ productNameInput.addEventListener("input", function() {
 
 componentTypeSelect.addEventListener('change', filterProductModels);
 
+// Función para cerrar modales con animación
+function closeModalWithAnimation(modal) {
+    anime({
+        targets: modal,
+        opacity: [1, 0],
+        scale: [1, 0.9],
+        duration: 300,
+        easing: 'easeInQuad',
+        complete: function() {
+            modal.style.display = "none";
+        }
+    });
+}
+
 closeModal.addEventListener("click", () => {
-    itemModal.style.display = "none";
+    closeModalWithAnimation(itemModal);
 });
 
 closeProductModal.addEventListener("click", () => {
-    productModal.style.display = "none";
+    closeModalWithAnimation(productModal);
 });
 
 closeSerialsModal.addEventListener("click", () => {
-    serialsDetailModal.style.display = "none";
+    closeModalWithAnimation(serialsDetailModal);
 });
 
 closeStatusModal.addEventListener("click", () => {
-    changeStatusModal.style.display = "none";
+    closeModalWithAnimation(changeStatusModal);
 });
 
 window.addEventListener("click", (e) => {
-    if (e.target === itemModal) itemModal.style.display = "none";
-    if (e.target === productModal) productModal.style.display = "none";
-    if (e.target === serialsDetailModal) serialsDetailModal.style.display = "none";
-    if (e.target === changeStatusModal) changeStatusModal.style.display = "none";
+    if (e.target === itemModal) closeModalWithAnimation(itemModal);
+    if (e.target === productModal) closeModalWithAnimation(productModal);
+    if (e.target === serialsDetailModal) closeModalWithAnimation(serialsDetailModal);
+    if (e.target === changeStatusModal) closeModalWithAnimation(changeStatusModal);
 });
 
 searchBtn.addEventListener("click", () => {
@@ -1035,6 +1300,10 @@ searchInput.addEventListener("input", (e) => {
 // INICIALIZACIÓN SEGURA
 // ====================================================================
 document.addEventListener("DOMContentLoaded", async () => {
+    // Inicializar animaciones
+    initializeAnimations();
+    setupLogoHoverAnimations();
+    
     const hasSession = await checkSession();
     
     if (hasSession) {
@@ -1067,6 +1336,12 @@ const dynamicStyles = `
     display: flex;
     align-items: center;
     gap: 8px;
+    transition: all 0.3s ease;
+}
+
+.btn-stock:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
 }
 
 .serial-row.almacen { background: rgba(0, 255, 136, 0.05); }
@@ -1106,6 +1381,26 @@ const dynamicStyles = `
 .historial-text {
     color: var(--color-text-secondary);
     font-size: 13px;
+}
+
+/* Animaciones para modales */
+.modal {
+    transition: opacity 0.3s ease;
+}
+
+.loading {
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid var(--color-primary);
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
 </style>
 `;

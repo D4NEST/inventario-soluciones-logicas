@@ -90,7 +90,7 @@ body::before {
   background: var(--color-gradient);
 }
 
-.login-card h1 {
+.login-card .company-name {
   text-align: center;
   color: var(--color-text);
   margin-bottom: 15px;
@@ -232,7 +232,7 @@ body::before {
   background: var(--color-bg-card);
   backdrop-filter: blur(20px);
   border-bottom: 1px solid var(--color-border);
-  padding: 20px 40px;
+  padding: 15px 40px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -241,7 +241,7 @@ body::before {
   z-index: 1000;
 }
 
-.header h1 {
+.header .header-titles h1 {
   color: var(--color-text);
   font-size: 24px;
   font-weight: 700;
@@ -249,6 +249,7 @@ body::before {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  margin: 0;
 }
 
 .user-info {
@@ -754,6 +755,7 @@ tbody tr:last-child td {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-primary-light);
 }
+
 /* ====================================================================
    CUSTOM SELECT STYLES - PARA LOS DESPLEGABLES
 ==================================================================== */
@@ -864,5 +866,129 @@ select.form-control:focus::-ms-value {
     select.form-control option {
         background: rgba(15, 15, 15, 0.95) !important;
         color: var(--color-text) !important;
+    }
+}
+
+/* ====================================================================
+   LOGO ANIMATIONS & STYLES
+==================================================================== */
+
+/* Logo animation container */
+.logo-animation {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    margin-bottom: 30px;
+}
+
+/* Logo image styles */
+.logo {
+    width: 60px;
+    height: 60px;
+    object-fit: contain;
+    opacity: 0;
+    transform: scale(0);
+    transition: var(--transition);
+}
+
+.company-name {
+    font-size: 2rem;
+    color: var(--color-text);
+    margin: 0;
+    opacity: 0;
+    transform: translateY(20px);
+    font-weight: 700;
+    background: var(--color-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* Dashboard header logo */
+.header-logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.header-logo .logo {
+    width: 40px;
+    height: 40px;
+    opacity: 1;
+    transform: scale(1);
+}
+
+.header-titles h1 {
+    margin: 0;
+    font-size: 1.5rem;
+    color: var(--color-text);
+    font-weight: 600;
+    background: var(--color-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.header-titles p {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--color-text-secondary);
+}
+
+/* Update existing login card for logo */
+.login-card .logo-animation {
+    margin-bottom: 40px;
+}
+
+/* Responsive logo styles */
+@media (max-width: 768px) {
+    .logo-animation {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .logo {
+        width: 50px;
+        height: 50px;
+    }
+    
+    .company-name {
+        font-size: 1.5rem;
+    }
+    
+    .header-logo {
+        flex-direction: column;
+        text-align: center;
+        gap: 8px;
+    }
+    
+    .header-titles h1 {
+        font-size: 1.3rem;
+    }
+    
+    .header-titles p {
+        font-size: 0.8rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .logo {
+        width: 45px;
+        height: 45px;
+    }
+    
+    .company-name {
+        font-size: 1.3rem;
+    }
+    
+    .header {
+        padding: 12px 20px;
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .header-logo {
+        order: -1;
     }
 }

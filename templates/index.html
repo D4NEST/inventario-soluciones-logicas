@@ -3,111 +3,130 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>InventarioPro - Gestión de Seriales</title>
+    <title>Soluciones Lógicas - Inventario</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <link rel="stylesheet" href="/static/styles.css"> 
+    <link rel="stylesheet" href="/static/styles.css">
+    <!-- Anime.js para animaciones -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
 </head>
 <body>
-    <div class="login-container" id="loginContainer">
-        <div class="login-card">
-            <h1><i class="fas fa-box"></i> Soluciones Lógicas</h1>
-            <p>Sistema de Gestión de Inventario</p>
-            <form id="loginForm">
-                <div class="form-group">
-                    <label for="username"><i class="fas fa-user"></i> Usuario</label>
-                    <input type="text" id="username" class="form-control" placeholder="Ingresa tu usuario" required>
+    <div id="app">
+        <!-- Login Screen -->
+        <div id="loginScreen" class="screen active">
+            <div class="login-container">
+                <div class="logo-animation">
+                    <img src="/static/images/logopeneges.png" alt="Soluciones Lógicas" class="logo" id="animatedLogo">
+                    <h1 class="company-name">Soluciones Lógicas</h1>
                 </div>
-                <div class="form-group">
-                    <label for="password"><i class="fas fa-lock"></i> Contraseña</label>
-                    <input type="password" id="password" class="form-control" placeholder="Ingresa tu contraseña" required>
-                </div>
-                <button type="submit" class="btn btn-block">
-                    <i class="fas fa-sign-in-alt"></i> Iniciar Sesión
-                </button>
-                <div id="loginError" class="alert alert-danger" style="display: none;">
-                    <i class="fas fa-exclamation-triangle"></i> Usuario o contraseña incorrectos
-                </div>
-            </form>
+                
+                <form class="login-form" id="loginForm">
+                    <h2>Sistema de Gestión de Inventario</h2>
+                    
+                    <div class="form-group">
+                        <label for="username">USUARIO</label>
+                        <input type="text" id="username" name="username" placeholder="Ingresa tu usuario" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="password">CONTRASEÑA</label>
+                        <input type="password" id="password" name="password" placeholder="Ingresa tu contraseña" required>
+                    </div>
+                    
+                    <button type="submit" class="login-btn">INICIAR SESIÓN</button>
+                    
+                    <div id="loginError" class="alert alert-danger" style="display: none;">
+                        <i class="fas fa-exclamation-triangle"></i> Usuario o contraseña incorrectos
+                    </div>
+                </form>
+            </div>
         </div>
-    </div>
 
-    <div class="dashboard" id="dashboard">
-        <header class="header">
-            <h1><i class="fas fa-boxes"></i> Soluciones Lógicas - Inventario</h1>
-            <div class="user-info">
-                <div class="user-avatar" id="userInitial">A</div>
-                <span id="userName">Administrador</span>
-                <button class="logout-btn" id="logoutBtn">
-                    <i class="fas fa-sign-out-alt"></i> Cerrar Sesión
-                </button>
-            </div>
-        </header>
-
-        <main class="main-content">
-            <div class="container">
-                <div class="page-title">
-                    <h1><i class="fas fa-boxes-stacked"></i> Gestión de Inventario</h1>
-                    <div class="header-buttons">
-                        <button class="btn" id="addItemBtn">
-                            <i class="fas fa-barcode"></i> Registrar Serial
-                        </button>
-                        <button class="btn btn-success" id="addProductBtn">
-                            <i class="fas fa-plus-circle"></i> Producto Nuevo
-                        </button>
+        <!-- Dashboard Screen -->
+        <div id="dashboardScreen" class="screen">
+            <header class="dashboard-header">
+                <div class="header-logo">
+                    <img src="/static/images/logopeneges.png" alt="Soluciones Lógicas" class="logo" id="dashboardLogo">
+                    <div class="header-titles">
+                        <h1>Soluciones Lógicas</h1>
+                        <p>Gestión de Inventario</p>
                     </div>
                 </div>
+                
+                <div class="user-info">
+                    <div class="user-avatar" id="userInitial">A</div>
+                    <span id="userName">Administrador</span>
+                    <button id="logoutBtn" class="logout-btn">
+                        <i class="fas fa-sign-out-alt"></i> Cerrar Sesión
+                    </button>
+                </div>
+            </header>
 
-                <!-- Estadísticas -->
-                <div class="stats">
-                    <div class="stat-card">
-                        <div class="stat-value" id="totalItems">0</div>
-                        <div class="stat-label"><i class="fas fa-cubes"></i> Total de Modelos</div>
+            <main class="main-content">
+                <div class="container">
+                    <div class="page-title">
+                        <h1><i class="fas fa-boxes-stacked"></i> Gestión de Inventario</h1>
+                        <div class="header-buttons">
+                            <button class="btn" id="addItemBtn">
+                                <i class="fas fa-barcode"></i> Registrar Serial
+                            </button>
+                            <button class="btn btn-success" id="addProductBtn">
+                                <i class="fas fa-plus-circle"></i> Producto Nuevo
+                            </button>
+                        </div>
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-value" id="lowStockItems">0</div>
-                        <div class="stat-label"><i class="fas fa-exclamation-triangle"></i> Stock Bajo</div>
+
+                    <!-- Estadísticas -->
+                    <div class="stats">
+                        <div class="stat-card">
+                            <div class="stat-value" id="totalItems">0</div>
+                            <div class="stat-label"><i class="fas fa-cubes"></i> Total de Modelos</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="lowStockItems">0</div>
+                            <div class="stat-label"><i class="fas fa-exclamation-triangle"></i> Stock Bajo</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="totalValue">0</div>
+                            <div class="stat-label"><i class="fas fa-boxes"></i> Total Seriales</div>
+                        </div>
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-value" id="totalValue">0</div>
-                        <div class="stat-label"><i class="fas fa-boxes"></i> Total Seriales</div>
+
+                    <!-- Tabla de Inventario -->
+                    <div class="card">
+                        <div class="search-bar">
+                            <input type="text" id="searchInput" class="form-control" placeholder="Buscar por modelo, SKU o tipo...">
+                            <button class="btn" id="searchBtn">
+                                <i class="fas fa-search"></i> Buscar
+                            </button>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table id="inventoryTable">
+                                <thead>
+                                    <tr>
+                                        <th><i class="fas fa-hashtag"></i> ID</th>
+                                        <th><i class="fas fa-cube"></i> Modelo/Nombre</th>
+                                        <th><i class="fas fa-tags"></i> Categoría</th>
+                                        <th><i class="fas fa-barcode"></i> SKU</th>
+                                        <th><i class="fas fa-boxes"></i> Stock</th>
+                                        <th><i class="fas fa-info-circle"></i> Estado</th>
+                                        <th><i class="fas fa-history"></i> Última Actividad</th>
+                                        <th><i class="fas fa-cogs"></i> Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="inventoryTableBody">
+                                    <tr>
+                                        <td colspan="8" style="text-align: center; padding: 40px;">
+                                            <div class="loading"></div> Cargando inventario...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
-
-                <!-- Tabla de Inventario -->
-                <div class="card">
-                    <div class="search-bar">
-                        <input type="text" id="searchInput" class="form-control" placeholder="Buscar por modelo, SKU o tipo...">
-                        <button class="btn" id="searchBtn">
-                            <i class="fas fa-search"></i> Buscar
-                        </button>
-                    </div>
-
-                    <div class="table-responsive">
-                        <table id="inventoryTable">
-                            <thead>
-                                <tr>
-                                    <th><i class="fas fa-hashtag"></i> ID</th>
-                                    <th><i class="fas fa-cube"></i> Modelo/Nombre</th>
-                                    <th><i class="fas fa-tags"></i> Categoría</th>
-                                    <th><i class="fas fa-barcode"></i> SKU</th>
-                                    <th><i class="fas fa-boxes"></i> Stock</th>
-                                    <th><i class="fas fa-info-circle"></i> Estado</th>
-                                    <th><i class="fas fa-history"></i> Última Actividad</th>
-                                    <th><i class="fas fa-cogs"></i> Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody id="inventoryTableBody">
-                                <tr>
-                                    <td colspan="7" style="text-align: center; padding: 40px;">
-                                        <div class="loading"></div> Cargando inventario...
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </main>
+            </main>
+        </div>
     </div>
 
     <!-- Modal: Registrar Serial -->

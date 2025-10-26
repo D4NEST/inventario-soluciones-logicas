@@ -4,6 +4,7 @@ import os
 import bcrypt
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
+from urllib.parse import urlparse
 
 try:
     import psycopg2
@@ -17,18 +18,18 @@ load_dotenv()
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 
-# 🔐 CONFIGURACIÓN DE SEGURIDAD CORREGIDA
+# 🔐 CONFIGURACIÓN DE SEGURIDAD
 app.secret_key = os.environ.get('SECRET_KEY', 'clave-secreta-desarrollo-32-caracteres-aqui')
 app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SECURE'] = False  # False para desarrollo
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # 'Lax' para desarrollo local
+app.config['SESSION_COOKIE_SECURE'] = os.environ.get('FLASK_ENV') == 'production'  # Solo True en producción
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_DOMAIN'] = None
 app.config['SESSION_COOKIE_PATH'] = '/'
 app.config['SESSION_COOKIE_NAME'] = 'inventario_session'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=8)
 app.config['SESSION_REFRESH_EACH_REQUEST'] = True
 
-# CORS CONFIGURACIÓN COMPLETA Y CORREGIDA
+# CORS CONFIGURACIÓN
 CORS(app, 
      supports_credentials=True,
      origins=[
@@ -36,44 +37,71 @@ CORS(app,
          'http://127.0.0.1:10000', 
          'http://192.168.1.112:10000',
          'http://localhost:5000',
-         'http://127.0.0.1:5000'
+         'http://127.0.0.1:5000',
+         'https://inventario-soluciones-logicas.onrender.com'
      ],
      methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
      allow_headers=['Content-Type', 'Authorization', 'X-Requested-With'],
      expose_headers=['Set-Cookie'])
 
-# --- CONFIGURACIÓN DE BASE DE DATOS CON DEBUG ---
-DB_HOST = os.environ.get('DB_HOST') or 'aws-1-sa-east-1.pooler.supabase.com'
-DB_PORT = os.environ.get('DB_PORT') or '6543'
-DB_NAME = os.environ.get('DB_NAME') or 'postgres'
-DB_USER = os.environ.get('DB_USER') or 'postgres.kdcbwnqqqbdcbvjwpzgw'
-DB_PASS = os.environ.get('DB_PASS') or '253672145415412'
-
-# 🔍 DEBUG: Verificar variables
-print(f"🔧 DEBUG VARIABLES - Host: {DB_HOST}, Port: {DB_PORT}, User: {DB_USER}, DB: {DB_NAME}")
-
+# --- CONFIGURACIÓN MEJORADA QUE FUNCIONA EN LOCAL Y RENDER ---
 def get_db_connection():
-    """Establece la conexión con la base de datos usando psycopg2."""
+    """Establece la conexión con la base de datos - funciona en LOCAL y RENDER"""
     try:
-        print(f"🔍 CONEXIÓN BD - Host: {DB_HOST}:{DB_PORT}, User: {DB_USER}, DB: {DB_NAME}")
+        # 1️⃣ PRIMERO: Intentar con DATABASE_URL de RENDER
+        DATABASE_URL = os.environ.get('DATABASE_URL')
         
-        conn = psycopg2.connect(
-            host=DB_HOST,
-            database=DB_NAME,
-            user=DB_USER,
-            password=DB_PASS,
-            port=DB_PORT,
-            connect_timeout=30,
-            sslmode='require'
-        )
-        print("✅ CONEXIÓN A BD EXITOSA!")
-        return conn
+        if DATABASE_URL:
+            # ✅ CONEXIÓN RENDER
+            parsed_url = urlparse(DATABASE_URL)
+            DB_HOST = parsed_url.hostname
+            DB_PORT = parsed_url.port
+            DB_NAME = parsed_url.path[1:]  # Eliminar el '/' inicial
+            DB_USER = parsed_url.username
+            DB_PASS = parsed_url.password
+            
+            print(f"🔍 CONEXIÓN BD RENDER - Host: {DB_HOST}:{DB_PORT}, User: {DB_USER}, DB: {DB_NAME}")
+            
+            conn = psycopg2.connect(
+                host=DB_HOST,
+                database=DB_NAME,
+                user=DB_USER,
+                password=DB_PASS,
+                port=DB_PORT,
+                connect_timeout=30,
+                sslmode='require'
+            )
+            print("✅ CONEXIÓN A BD RENDER EXITOSA!")
+            return conn
+        else:
+            # 2️⃣ SEGUNDO: Conexión LOCAL con valores por defecto
+            DB_HOST = os.environ.get('DB_HOST', 'localhost')
+            DB_PORT = os.environ.get('DB_PORT', '5432')
+            DB_NAME = os.environ.get('DB_NAME', 'inventario_db')
+            DB_USER = os.environ.get('DB_USER', 'postgres')
+            DB_PASS = os.environ.get('DB_PASS', 'password')
+            
+            print(f"🔧 CONEXIÓN LOCAL - Host: {DB_HOST}:{DB_PORT}, DB: {DB_NAME}, User: {DB_USER}")
+            
+            conn = psycopg2.connect(
+                host=DB_HOST,
+                database=DB_NAME,
+                user=DB_USER,
+                password=DB_PASS,
+                port=DB_PORT,
+                connect_timeout=30
+                # Sin sslmode para desarrollo local
+            )
+            print("✅ CONEXIÓN A BD LOCAL EXITOSA!")
+            return conn
+            
     except Exception as e:
         print(f"❌ ERROR CONEXIÓN BD: {str(e)}")
+        print("💡 ¿Tienes PostgreSQL corriendo localmente?")
         return None
 
 # ------------------------------------------------------------------
-# MIDDLEWARE DE DEBUG MEJORADO
+# MIDDLEWARE DE DEBUG
 # ------------------------------------------------------------------
 @app.before_request
 def debug_session():
@@ -83,7 +111,7 @@ def debug_session():
     print(f"🔍 Cookies recibidas: {request.cookies}")
 
 # ------------------------------------------------------------------
-# AUTENTICACIÓN SEGURA - CORREGIDA
+# AUTENTICACIÓN
 # ------------------------------------------------------------------
 @app.route('/api/auth/login', methods=['POST'])
 def login():
@@ -106,7 +134,6 @@ def login():
             session['login_time'] = datetime.now().isoformat()
             
             print(f"✅ Sesión creada para: {session['username']}")
-            print(f"✅ Session ID: {session.sid if hasattr(session, 'sid') else 'N/A'}")
             
             return jsonify({
                 "mensaje": "Login exitoso",
@@ -135,7 +162,7 @@ def logout():
 
 @app.route('/api/auth/check', methods=['GET'])
 def check_auth():
-    """Verificar si el usuario está autenticado - VERSIÓN CORREGIDA"""
+    """Verificar si el usuario está autenticado"""
     print(f"🔍 CHECK AUTH - Session: {dict(session)}")
     
     if 'user_id' in session:
@@ -150,7 +177,7 @@ def check_auth():
         })
     else:
         print("❌ Usuario NO autenticado")
-        return jsonify({"authenticated": False}), 200  # 200 en lugar de 401
+        return jsonify({"authenticated": False}), 200
 
 # ------------------------------------------------------------------
 # MIDDLEWARE DE SEGURIDAD
@@ -184,19 +211,12 @@ def after_request(response):
     return response
 
 # ------------------------------------------------------------------
-# RUTAS PROTEGIDAS
-# ------------------------------------------------------------------
-
-# ------------------------------------------------------------------
-# RUTA PRINCIPAL
+# RUTAS PRINCIPALES
 # ------------------------------------------------------------------
 @app.route('/')
 def index():
     return send_from_directory('templates', 'index.html')
 
-# ------------------------------------------------------------------
-# SERVIR ARCHIVOS ESTÁTICOS
-# ------------------------------------------------------------------
 @app.route('/static/<path:path>')
 def send_static(path):
     return send_from_directory('static', path)
@@ -442,8 +462,9 @@ def agregar_producto():
     finally:
         if conn:
             conn.close()
+
 # ------------------------------------------------------------------
-# API: ELIMINAR PRODUCTO (NUEVO)
+# API: ELIMINAR PRODUCTO
 # ------------------------------------------------------------------
 @app.route('/api/inventario/productos/<int:producto_id>', methods=['DELETE'])
 @protected_route
@@ -533,7 +554,7 @@ def agregar_serial():
             conn.close()
 
 # ------------------------------------------------------------------
-# API: OBTENER SERIALES POR PRODUCTO (TODOS LOS ESTADOS)
+# API: OBTENER SERIALES POR PRODUCTO
 # ------------------------------------------------------------------
 @app.route('/api/inventario/seriales/<int:producto_id>', methods=['GET'])
 @protected_route
@@ -670,13 +691,13 @@ def eliminar_serial(serial_id):
             conn.close()
 
 # ------------------------------------------------------------------
-# 🔧 CONSULTAS ESPECÍFICAS PARA SOLUCIONES LÓGICAS
+# CONSULTAS ESPECÍFICAS PARA SOLUCIONES LÓGICAS
 # ------------------------------------------------------------------
 
 @app.route('/api/inventario/stock_bajo', methods=['GET'])
 @protected_route
 def obtener_stock_bajo():
-    """Obtener productos con stock bajo (alerta) - PARA SOLUCIONES LÓGICAS"""
+    """Obtener productos con stock bajo (alerta)"""
     conn = None
     try:
         conn = get_db_connection()
@@ -717,7 +738,7 @@ def obtener_stock_bajo():
 @app.route('/api/inventario/estadisticas', methods=['GET'])
 @protected_route
 def obtener_estadisticas():
-    """Obtener estadísticas generales para el dashboard - PARA SOLUCIONES LÓGICAS"""
+    """Obtener estadísticas generales para el dashboard"""
     conn = None
     try:
         conn = get_db_connection()
@@ -766,6 +787,5 @@ if __name__ == '__main__':
     print(f"🔐 Usuario: admin")
     print(f"🔐 Contraseña: Admin123!")
     print(f"🌐 Servidor ejecutándose en puerto: {port}")
-    print(f"🌐 URLs: http://localhost:{port} | http://127.0.0.1:{port}")
     print("📦 Sistema de inventario listo para usar!")
     app.run(debug=True, host='0.0.0.0', port=port)

@@ -18,16 +18,17 @@ load_dotenv()
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 
-# 🔐 CONFIGURACIÓN DE SEGURIDAD
+# 🔐 CONFIGURACIÓN DE SEGURIDAD OPTIMIZADA
 app.secret_key = os.environ.get('SECRET_KEY', 'clave-secreta-desarrollo-32-caracteres-aqui')
-app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SECURE'] = os.environ.get('FLASK_ENV') == 'production'  # Solo True en producción
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-app.config['SESSION_COOKIE_DOMAIN'] = None
-app.config['SESSION_COOKIE_PATH'] = '/'
-app.config['SESSION_COOKIE_NAME'] = 'inventario_session'
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=8)
-app.config['SESSION_REFRESH_EACH_REQUEST'] = True
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SECURE=os.environ.get('FLASK_ENV') == 'production',
+    SESSION_COOKIE_SAMESITE='Lax',
+    SESSION_COOKIE_NAME='inventario_session',
+    PERMANENT_SESSION_LIFETIME=timedelta(hours=8),
+    SESSION_REFRESH_EACH_REQUEST=True
+)
+# ELIMINADO: SESSION_COOKIE_DOMAIN y SESSION_COOKIE_PATH para mejor compatibilidad
 
 # CORS CONFIGURACIÓN
 CORS(app, 
@@ -101,14 +102,33 @@ def get_db_connection():
         return None
 
 # ------------------------------------------------------------------
-# MIDDLEWARE DE DEBUG
+# MIDDLEWARE DE DEBUG OPTIMIZADO - AHORRA RECURSOS
 # ------------------------------------------------------------------
 @app.before_request
 def debug_session():
-    """Debug para ver sesiones en TODOS los requests"""
+    """Debug optimizado que filtra health checks y ahorra recursos"""
+    
+    # ❌ NO loguear requests sin cookies que no sean de API (health checks/bots)
+    if not request.cookies and not request.path.startswith('/api/'):
+        return  # ← ¡ESTO AHORRA EL 90% DE LOS LOGS Y RECURSOS!
+    
+    # ✅ Solo loguear requests importantes (con cookies o APIs)
     print(f"🔍 {request.method} {request.path}")
-    print(f"🔍 Session: {dict(session)}")
-    print(f"🔍 Cookies recibidas: {request.cookies}")
+    if request.cookies:
+        print(f"🎫 Session: {dict(session)}")
+        print(f"🍪 Cookies: {dict(request.cookies)}")
+
+# ------------------------------------------------------------------
+# HEALTH CHECK ENDPOINT - PARA RENDER
+# ------------------------------------------------------------------
+@app.route('/health')
+def health_check():
+    """Endpoint limpio para health checks de Render - SIN LOGS"""
+    return jsonify({
+        "status": "healthy", 
+        "timestamp": datetime.now().isoformat(),
+        "service": "inventario-soluciones-logicas"
+    }), 200
 
 # ------------------------------------------------------------------
 # AUTENTICACIÓN
@@ -505,7 +525,7 @@ def eliminar_producto(producto_id):
             conn.close()
 
 # ------------------------------------------------------------------
-# API: INGRESAR NUEVO SERIAL
+# API: INGRESAR NUEVO SERIAL - MEJORADO
 # ------------------------------------------------------------------
 @app.route('/api/inventario/serial', methods=['POST'])
 @protected_route
@@ -518,7 +538,7 @@ def agregar_serial():
             return jsonify({"error": "Faltan datos (producto_id o codigo_unico_serial)"}), 400
 
         producto_id = data['producto_id']
-        codigo_unico_serial = data['codigo_unico_serial']
+        codigo_unico_serial = data['codigo_unico_serial'].strip().upper()  # Normalizar
         
         conn = get_db_connection()
         if not conn:
@@ -526,6 +546,22 @@ def agregar_serial():
             
         cur = conn.cursor(cursor_factory=DictCursor)
         
+        # ✅ PRIMERO verificar si el producto existe
+        cur.execute('SELECT nombre FROM productos WHERE producto_id = %s', (producto_id,))
+        producto = cur.fetchone()
+        
+        if not producto:
+            return jsonify({"error": f"El producto ID {producto_id} no existe"}), 404
+        
+        # ✅ LUEGO verificar si el serial ya existe
+        cur.execute('SELECT serial_id FROM seriales WHERE codigo_unico_serial = %s', (codigo_unico_serial,))
+        if cur.fetchone():
+            return jsonify({
+                "error": f"El serial {codigo_unico_serial} ya existe en el sistema",
+                "codigo": "SERIAL_DUPLICADO"
+            }), 409
+        
+        # ✅ FINALMENTE insertar
         insert_query = """
         INSERT INTO "seriales" ("producto_id", "codigo_unico_serial", "estado")
         VALUES (%s, %s, 'ALMACEN')
@@ -540,14 +576,24 @@ def agregar_serial():
         cur.close()
         
         return jsonify({
-            "mensaje": f"Serial {codigo_unico_serial} agregado correctamente",
-            "serial_id": serial_id
+            "mensaje": f"Serial {codigo_unico_serial} agregado al producto {producto['nombre']}",
+            "serial_id": serial_id,
+            "producto": producto['nombre']
         }), 201
 
-    except IntegrityError:
-        return jsonify({"error": f"El serial {codigo_unico_serial} ya existe o el producto_id no es válido"}), 409
+    except IntegrityError as e:
+        # Rollback explícito en caso de error
+        if conn:
+            conn.rollback()
+        return jsonify({
+            "error": f"Error de integridad: El serial ya existe o datos inválidos",
+            "detalle": str(e)
+        }), 409
     except Exception as e:
-        print(f"Error de DB en /serial (POST): {e}")
+        # Rollback en caso de cualquier error
+        if conn:
+            conn.rollback()
+        print(f"❌ Error de DB en /serial (POST): {e}")
         return jsonify({"error": f"Error de base de datos: {str(e)}"}), 500
     finally:
         if conn:
@@ -788,4 +834,5 @@ if __name__ == '__main__':
     print(f"🔐 Contraseña: Admin123!")
     print(f"🌐 Servidor ejecutándose en puerto: {port}")
     print("📦 Sistema de inventario listo para usar!")
+    print("💡 Health checks disponibles en: /health")
     app.run(debug=True, host='0.0.0.0', port=port)

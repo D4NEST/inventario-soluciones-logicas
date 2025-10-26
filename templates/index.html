@@ -10,22 +10,22 @@
 <body>
     <div class="login-container" id="loginContainer">
         <div class="login-card">
-            <h1><i class="fas fa-box"></i> Soluciones Logicas</h1>
-            <p>Gestión de Seriales</p>
+            <h1><i class="fas fa-box"></i> Soluciones Lógicas</h1>
+            <p>Sistema de Gestión de Inventario</p>
             <form id="loginForm">
                 <div class="form-group">
-                    <label for="username">Usuario</label>
+                    <label for="username"><i class="fas fa-user"></i> Usuario</label>
                     <input type="text" id="username" class="form-control" placeholder="Ingresa tu usuario" required>
                 </div>
                 <div class="form-group">
-                    <label for="password">Contraseña</label>
+                    <label for="password"><i class="fas fa-lock"></i> Contraseña</label>
                     <input type="password" id="password" class="form-control" placeholder="Ingresa tu contraseña" required>
                 </div>
                 <button type="submit" class="btn btn-block">
                     <i class="fas fa-sign-in-alt"></i> Iniciar Sesión
                 </button>
                 <div id="loginError" class="alert alert-danger" style="display: none;">
-                    Usuario o contraseña incorrectos
+                    <i class="fas fa-exclamation-triangle"></i> Usuario o contraseña incorrectos
                 </div>
             </form>
         </div>
@@ -33,12 +33,12 @@
 
     <div class="dashboard" id="dashboard">
         <header class="header">
-            <h1><i class="fas fa-box"></i> SolucionesLogicas</h1>
+            <h1><i class="fas fa-boxes"></i> Soluciones Lógicas - Inventario</h1>
             <div class="user-info">
                 <div class="user-avatar" id="userInitial">A</div>
-                <span id="userName">Usuario</span>
+                <span id="userName">Administrador</span>
                 <button class="logout-btn" id="logoutBtn">
-                    <i class="fas fa-sign-out-alt"></i> Salir
+                    <i class="fas fa-sign-out-alt"></i> Cerrar Sesión
                 </button>
             </div>
         </header>
@@ -46,45 +46,61 @@
         <main class="main-content">
             <div class="container">
                 <div class="page-title">
-                    <h1>Gestión de Inventario (Seriales)</h1>
+                    <h1><i class="fas fa-boxes-stacked"></i> Gestión de Inventario</h1>
                     <div class="header-buttons">
                         <button class="btn" id="addItemBtn">
-                            <i class="fas fa-plus"></i> Ingreso de Serial
+                            <i class="fas fa-barcode"></i> Registrar Serial
                         </button>
                         <button class="btn btn-success" id="addProductBtn">
-                            <i class="fas fa-cube"></i> Agregar Producto
+                            <i class="fas fa-plus-circle"></i> Producto Nuevo
                         </button>
                     </div>
                 </div>
 
+                <!-- Estadísticas -->
                 <div class="stats">
-                    <div class="stat-card"><div class="stat-value" id="totalItems">0</div><div class="stat-label">Total de Modelos</div></div>
-                    <div class="stat-card"><div class="stat-value" id="lowStockItems">0</div><div class="stat-label">Stock Bajo/Cero</div></div>
-                    <div class="stat-card"><div class="stat-value" id="totalValue">0</div><div class="stat-label">Total de Seriales</div></div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="totalItems">0</div>
+                        <div class="stat-label"><i class="fas fa-cubes"></i> Total de Modelos</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="lowStockItems">0</div>
+                        <div class="stat-label"><i class="fas fa-exclamation-triangle"></i> Stock Bajo</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="totalValue">0</div>
+                        <div class="stat-label"><i class="fas fa-boxes"></i> Total Seriales</div>
+                    </div>
                 </div>
 
+                <!-- Tabla de Inventario -->
                 <div class="card">
                     <div class="search-bar">
-                        <input type="text" id="searchInput" class="form-control" placeholder="Buscar por Modelo o SKU...">
-                        <button class="btn" id="searchBtn"><i class="fas fa-search"></i> Buscar</button>
+                        <input type="text" id="searchInput" class="form-control" placeholder="Buscar por modelo, SKU o tipo...">
+                        <button class="btn" id="searchBtn">
+                            <i class="fas fa-search"></i> Buscar
+                        </button>
                     </div>
 
                     <div class="table-responsive">
                         <table id="inventoryTable">
                             <thead>
                                 <tr>
-                                    <th>ID</th>
-                                    <th>Modelo/Nombre</th>
-                                    <th>Tipo de Pieza</th>
-                                    <th>SKU</th>
-                                    <th>Stock</th>
-                                    <th>Estado</th>
-                                    <th>Historial de Actividad</th> 
+                                    <th><i class="fas fa-hashtag"></i> ID</th>
+                                    <th><i class="fas fa-cube"></i> Modelo/Nombre</th>
+                                    <th><i class="fas fa-tags"></i> Categoría</th>
+                                    <th><i class="fas fa-barcode"></i> SKU</th>
+                                    <th><i class="fas fa-boxes"></i> Stock</th>
+                                    <th><i class="fas fa-info-circle"></i> Estado</th>
+                                    <th><i class="fas fa-history"></i> Última Actividad</th>
+                                    <th><i class="fas fa-cogs"></i> Acciones</th>
                                 </tr>
                             </thead>
                             <tbody id="inventoryTableBody">
                                 <tr>
-                                    <td colspan="7" style="text-align: center; padding: 40px;"><div class="loading"></div> Cargando inventario...</td>
+                                    <td colspan="7" style="text-align: center; padding: 40px;">
+                                        <div class="loading"></div> Cargando inventario...
+                                    </td>
                                 </tr>
                             </tbody>
                         </table>
@@ -94,108 +110,223 @@
         </main>
     </div>
 
-    <!-- Modal: Agregar Serial -->
+    <!-- Modal: Registrar Serial -->
     <div class="modal" id="itemModal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Ingresar Nuevo Serial</h2>
+                <h2><i class="fas fa-barcode"></i> Registrar Nuevo Serial</h2>
                 <button class="close-btn" id="closeModal">&times;</button>
             </div>
             <form id="serialForm">
-                <div class="form-group">
-                    <label for="componentType">Tipo de Componente</label>
-                    <select id="componentType" class="form-control" required>
-                        <option value="">-- Selecciona un Tipo --</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label for="serialProduct">Modelo Específico</label>
-                    <select id="serialProduct" class="form-control" required disabled>
-                        <option value="">-- Selecciona un Modelo (Selecciona Tipo primero) --</option>
-                    </select>
-                </div>
+                <div style="padding: 25px;">
+                    <div class="form-group">
+                        <label for="componentType">
+                            <i class="fas fa-tags"></i> Categoría del Producto
+                        </label>
+                        <select id="componentType" class="form-control" required>
+                            <option value="">-- Selecciona una categoría --</option>
+                        </select>
+                        <small style="color: var(--color-text-secondary); font-size: 12px; margin-top: 5px;">
+                            Primero selecciona la categoría del producto
+                        </small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="serialProduct">
+                            <i class="fas fa-cube"></i> Modelo Específico
+                        </label>
+                        <select id="serialProduct" class="form-control" required disabled>
+                            <option value="">-- Selecciona un modelo (elige categoría primero) --</option>
+                        </select>
+                        <small style="color: var(--color-text-secondary); font-size: 12px; margin-top: 5px;">
+                            Elige el modelo específico al que pertenece este serial
+                        </small>
+                    </div>
 
-                <div class="form-group">
-                    <label for="serialCode">Código Único de Serial</label>
-                    <input type="text" id="serialCode" class="form-control" placeholder="SN-DS8K-0001" required>
+                    <div class="form-group">
+                        <label for="serialCode">
+                            <i class="fas fa-barcode"></i> Código Único de Serial
+                        </label>
+                        <input type="text" id="serialCode" class="form-control" 
+                               placeholder="Ej: SN-LEN-T14-001, SRL-CISCO-2900-001" 
+                               required>
+                        <small style="color: var(--color-text-secondary); font-size: 12px; margin-top: 5px;">
+                            Ingresa el código único del serial. Este identificador no se puede repetir.
+                        </small>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-block" id="saveSerialBtn">
+                        <i class="fas fa-save"></i> Registrar Serial en Inventario
+                    </button>
+                    
+                    <div id="serialMessage" class="alert" style="display: none; margin-top: 20px;"></div>
                 </div>
-                
-                <button type="submit" class="btn btn-block" id="saveSerialBtn">
-                    <i class="fas fa-save"></i> Registrar Serial
-                </button>
-                
-                <div id="serialMessage" class="alert" style="display: none;"></div>
             </form>
         </div>
     </div>
 
-    <!-- Modal: Agregar Producto -->
+    <!-- Modal: Producto Nuevo - MEJORADO -->
     <div class="modal" id="productModal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Agregar Nuevo Producto</h2>
+                <h2><i class="fas fa-plus-circle"></i> Registrar Producto Nuevo</h2>
                 <button class="close-btn" id="closeProductModal">&times;</button>
             </div>
             <form id="productForm">
-                <div class="form-group">
-                    <label for="productName">Nombre del Producto</label>
-                    <input type="text" id="productName" class="form-control" placeholder="Ej: Lenovo ThinkPad T14" required>
+                <div style="padding: 25px;">
+                    <div class="form-group">
+                        <label for="productName">
+                            <i class="fas fa-tag"></i> Nombre del Producto
+                        </label>
+                        <input type="text" id="productName" class="form-control" 
+                               placeholder="Ej: Laptop Lenovo ThinkPad T14, Router Cisco 2900, Cable Red CAT6..." 
+                               required>
+                        <small style="color: var(--color-text-secondary); font-size: 12px; margin-top: 5px;">
+                            Describe claramente el producto para identificarlo fácilmente
+                        </small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="productDescription">
+                            <i class="fas fa-align-left"></i> Descripción (Opcional)
+                        </label>
+                        <textarea id="productDescription" class="form-control" 
+                                  placeholder="Especificaciones técnicas, características importantes, modelo específico..."
+                                  rows="3"></textarea>
+                        <small style="color: var(--color-text-secondary); font-size: 12px; margin-top: 5px;">
+                            Información adicional que ayude a identificar el producto
+                        </small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="productType">
+                            <i class="fas fa-cube"></i> Categoría del Producto
+                        </label>
+                        <select id="productType" class="form-control" required>
+                            <option value="">-- Selecciona una categoría --</option>
+                        </select>
+                        <small style="color: var(--color-text-secondary); font-size: 12px; margin-top: 5px;">
+                            Si no encuentras la categoría adecuada, selecciona la más similar
+                        </small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="productSKU">
+                            <i class="fas fa-barcode"></i> Código SKU/Referencia
+                        </label>
+                        <input type="text" id="productSKU" class="form-control" 
+                               placeholder="Ej: LAP-LEN-T14, ROUTER-CISCO-2900, CABLE-CAT6-3M" 
+                               required>
+                        <small style="color: var(--color-text-secondary); font-size: 12px; margin-top: 5px;">
+                            Código único para identificar el producto en el inventario
+                        </small>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-block" style="margin-top: 20px;">
+                        <i class="fas fa-save"></i> Guardar Producto
+                    </button>
+                    
+                    <div id="productMessage" class="alert" style="display: none; margin-top: 20px;"></div>
                 </div>
-                
-                <div class="form-group">
-                    <label for="productDescription">Descripción</label>
-                    <textarea id="productDescription" class="form-control" placeholder="Descripción del producto..." rows="3"></textarea>
-                </div>
-                
-                <div class="form-group">
-                    <label for="productType">Tipo de Componente</label>
-                    <select id="productType" class="form-control" required>
-                        <option value="">-- Selecciona un Tipo --</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label for="productSKU">Código SKU</label>
-                    <input type="text" id="productSKU" class="form-control" placeholder="Ej: SKU-LAP-LEN-T14" required>
-                </div>
-                
-                <button type="submit" class="btn btn-block">
-                    <i class="fas fa-save"></i> Guardar Producto
-                </button>
-                
-                <div id="productMessage" class="alert" style="display: none;"></div>
             </form>
         </div>
     </div>
     
-    <!-- Modal: Ver Seriales -->
+    <!-- Modal: Gestión de Seriales - MEJORADO -->
     <div class="modal" id="serialsDetailModal">
-        <div class="modal-content" style="max-width: 800px;">
+        <div class="modal-content" style="max-width: 1000px;">
             <div class="modal-header">
-                <h2 id="serialsModalTitle">Seriales en Almacén</h2>
+                <h2 id="serialsModalTitle"><i class="fas fa-boxes"></i> Gestión de Seriales</h2>
                 <button class="close-btn" id="closeSerialsModal">&times;</button>
             </div>
             <div style="padding: 25px;">
-                <p style="margin-bottom: 20px; color: #666;">Lista de seriales por modelo con su última actividad registrada.</p>
+                <div class="alert alert-info" style="margin-bottom: 20px;">
+                    <i class="fas fa-info-circle"></i> 
+                    Gestiona el estado de los seriales. Los cambios afectarán el stock disponible.
+                </div>
+                
                 <div class="table-responsive">
                     <table id="serialsTable">
                         <thead>
                             <tr>
-                                <th>Serial ID</th>
-                                <th>Código de Serial</th>
-                                <th>Estado Actual</th>
-                                <th>Última Actividad</th>
-                                <th>Ver Historial</th>
+                                <th><i class="fas fa-hashtag"></i> ID</th>
+                                <th><i class="fas fa-barcode"></i> Código Serial</th>
+                                <th><i class="fas fa-info-circle"></i> Estado</th>
+                                <th><i class="fas fa-calendar"></i> Fecha Ingreso</th>
+                                <th><i class="fas fa-cogs"></i> Acciones</th>
                             </tr>
                         </thead>
                         <tbody id="serialsTableBody">
                             <tr>
-                                <td colspan="5" style="text-align: center;">Cargando...</td>
+                                <td colspan="5" style="text-align: center; padding: 40px;">
+                                    <div class="loading"></div> Cargando seriales...
+                                </td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
+
+                <!-- Panel de acciones rápidas -->
+                <div style="margin-top: 25px; padding: 20px; background: var(--color-bg-card); border-radius: var(--border-radius);">
+                    <h4 style="margin-bottom: 15px; color: var(--color-text);">
+                        <i class="fas fa-bolt"></i> Acciones Rápidas
+                    </h4>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button class="btn btn-sm" id="btnMarcarInstalados" style="display: none;">
+                            <i class="fas fa-wrench"></i> Marcar como Instalados
+                        </button>
+                        <button class="btn btn-sm btn-danger" id="btnMarcarDanados" style="display: none;">
+                            <i class="fas fa-times-circle"></i> Marcar como Dañados
+                        </button>
+                        <button class="btn btn-sm btn-warning" id="btnMarcarRetirados" style="display: none;">
+                            <i class="fas fa-truck"></i> Marcar como Retirados
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Cambiar Estado de Serial -->
+    <div class="modal" id="changeStatusModal">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2><i class="fas fa-exchange-alt"></i> Cambiar Estado del Serial</h2>
+                <button class="close-btn" id="closeStatusModal">&times;</button>
+            </div>
+            <div style="padding: 25px;">
+                <div class="form-group">
+                    <label for="newStatus">
+                        <i class="fas fa-info-circle"></i> Nuevo Estado
+                    </label>
+                    <select id="newStatus" class="form-control" required>
+                        <option value="">-- Selecciona el nuevo estado --</option>
+                        <option value="ALMACEN">🟢 Almacén (Disponible)</option>
+                        <option value="INSTALADO">🔵 Instalado (En uso)</option>
+                        <option value="DAÑADO">🔴 Dañado (No usable)</option>
+                        <option value="RETIRADO">🟡 Retirado (Fuera de servicio)</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="statusNotes">
+                        <i class="fas fa-sticky-note"></i> Notas (Opcional)
+                    </label>
+                    <textarea id="statusNotes" class="form-control" 
+                              placeholder="Motivo del cambio, ubicación, observaciones..."
+                              rows="3"></textarea>
+                </div>
+                
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button type="button" class="btn" id="confirmStatusChange">
+                        <i class="fas fa-check"></i> Confirmar Cambio
+                    </button>
+                    <button type="button" class="btn btn-danger" id="cancelStatusChange">
+                        <i class="fas fa-times"></i> Cancelar
+                    </button>
+                </div>
+                
+                <div id="statusMessage" class="alert" style="display: none; margin-top: 20px;"></div>
             </div>
         </div>
     </div>

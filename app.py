@@ -17,23 +17,24 @@ load_dotenv()
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 
-# 🔐 CONFIGURACIÓN DE SEGURIDAD MEJORADA PARA RENDER
+# 🔐 CONFIGURACIÓN DE SEGURIDAD CORREGIDA
 app.secret_key = os.environ.get('SECRET_KEY', 'clave-secreta-desarrollo-32-caracteres-aqui')
 app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SECURE'] = True  # True para producción (HTTPS)
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SECURE'] = False  # False para desarrollo
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # 'Lax' para desarrollo local
 app.config['SESSION_COOKIE_DOMAIN'] = None
 app.config['SESSION_COOKIE_PATH'] = '/'
 app.config['SESSION_COOKIE_NAME'] = 'inventario_session'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=8)
+app.config['SESSION_REFRESH_EACH_REQUEST'] = True
 
-# CORS CONFIGURACIÓN MEJORADA PARA RENDER
+# CORS CONFIGURACIÓN COMPLETA Y CORREGIDA
 CORS(app, 
      supports_credentials=True,
      origins=[
-         'https://inventario-soluciones-logicas.onrender.com',
-         'http://localhost:3000',
-         'http://127.0.0.1:3000',
+         'http://localhost:10000',
+         'http://127.0.0.1:10000', 
+         'http://192.168.1.112:10000',
          'http://localhost:5000',
          'http://127.0.0.1:5000'
      ],
@@ -42,14 +43,15 @@ CORS(app,
      expose_headers=['Set-Cookie'])
 
 # --- CONFIGURACIÓN DE BASE DE DATOS CON DEBUG ---
-DB_HOST = os.environ.get('DB_HOST') or 'db.kdcbwnqqqbdcbvjwpzgw.supabase.co'
-DB_PORT = os.environ.get('DB_PORT') or '5432'
+DB_HOST = os.environ.get('DB_HOST') or 'aws-1-sa-east-1.pooler.supabase.com'
+DB_PORT = os.environ.get('DB_PORT') or '6543'
 DB_NAME = os.environ.get('DB_NAME') or 'postgres'
-DB_USER = os.environ.get('DB_USER') or 'postgres'
+DB_USER = os.environ.get('DB_USER') or 'postgres.kdcbwnqqqbdcbvjwpzgw'
 DB_PASS = os.environ.get('DB_PASS') or '253672145415412'
 
 # 🔍 DEBUG: Verificar variables
 print(f"🔧 DEBUG VARIABLES - Host: {DB_HOST}, Port: {DB_PORT}, User: {DB_USER}, DB: {DB_NAME}")
+
 def get_db_connection():
     """Establece la conexión con la base de datos usando psycopg2."""
     try:
@@ -62,7 +64,7 @@ def get_db_connection():
             password=DB_PASS,
             port=DB_PORT,
             connect_timeout=30,
-            sslmode='require'  # 👈 SSL OBLIGATORIO PARA SUPABASE
+            sslmode='require'
         )
         print("✅ CONEXIÓN A BD EXITOSA!")
         return conn
@@ -71,16 +73,17 @@ def get_db_connection():
         return None
 
 # ------------------------------------------------------------------
-# MIDDLEWARE DE DEBUG
+# MIDDLEWARE DE DEBUG MEJORADO
 # ------------------------------------------------------------------
 @app.before_request
 def debug_session():
-    """Debug para ver sesiones en requests de API"""
-    if request.endpoint and 'api' in request.endpoint:
-        print(f"🔍 {request.method} {request.path} - Session: {dict(session)}")
+    """Debug para ver sesiones en TODOS los requests"""
+    print(f"🔍 {request.method} {request.path}")
+    print(f"🔍 Session: {dict(session)}")
+    print(f"🔍 Cookies recibidas: {request.cookies}")
 
 # ------------------------------------------------------------------
-# AUTENTICACIÓN SEGURA
+# AUTENTICACIÓN SEGURA - CORREGIDA
 # ------------------------------------------------------------------
 @app.route('/api/auth/login', methods=['POST'])
 def login():
@@ -103,12 +106,14 @@ def login():
             session['login_time'] = datetime.now().isoformat()
             
             print(f"✅ Sesión creada para: {session['username']}")
+            print(f"✅ Session ID: {session.sid if hasattr(session, 'sid') else 'N/A'}")
             
             return jsonify({
                 "mensaje": "Login exitoso",
                 "user": {
                     "name": "Administrador",
-                    "role": "admin"
+                    "role": "admin",
+                    "username": "admin"
                 }
             })
         else:
@@ -130,16 +135,22 @@ def logout():
 
 @app.route('/api/auth/check', methods=['GET'])
 def check_auth():
-    """Verificar si el usuario está autenticado"""
+    """Verificar si el usuario está autenticado - VERSIÓN CORREGIDA"""
+    print(f"🔍 CHECK AUTH - Session: {dict(session)}")
+    
     if 'user_id' in session:
+        print(f"✅ Usuario autenticado: {session.get('username')}")
         return jsonify({
             "authenticated": True,
             "user": {
                 "name": session.get('name'),
-                "role": session.get('role')
+                "role": session.get('role'),
+                "username": session.get('username')
             }
         })
-    return jsonify({"authenticated": False}), 401
+    else:
+        print("❌ Usuario NO autenticado")
+        return jsonify({"authenticated": False}), 200  # 200 en lugar de 401
 
 # ------------------------------------------------------------------
 # MIDDLEWARE DE SEGURIDAD
@@ -160,6 +171,17 @@ def protected_route(f):
         return f(*args, **kwargs)
     decorated_function.__name__ = f.__name__
     return decorated_function
+
+# ------------------------------------------------------------------
+# MIDDLEWARE PARA HEADERS DE SEGURIDAD
+# ------------------------------------------------------------------
+@app.after_request
+def after_request(response):
+    """Agregar headers de seguridad a todas las respuestas"""
+    response.headers.add('Access-Control-Allow-Credentials', 'true')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With')
+    response.headers.add('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+    return response
 
 # ------------------------------------------------------------------
 # RUTAS PROTEGIDAS
@@ -276,6 +298,67 @@ def obtener_tipos_pieza():
             conn.close()
 
 # ------------------------------------------------------------------
+# API: INICIALIZAR TIPOS DE PIEZA PREDEFINIDOS
+# ------------------------------------------------------------------
+@app.route('/api/inventario/inicializar_tipos', methods=['POST'])
+@protected_route
+def inicializar_tipos_pieza():
+    """Inicializar tipos de pieza predeterminados para Soluciones Lógicas"""
+    conn = None
+    try:
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({"error": "No se pudo conectar a la base de datos"}), 500
+            
+        cur = conn.cursor(cursor_factory=DictCursor)
+        
+        # Tipos predeterminados para una empresa de informática
+        tipos_predeterminados = [
+            'Computadoras y Laptops',
+            'Servidores y Mainframe',
+            'Redes y Comunicaciones',
+            'Almacenamiento',
+            'Componentes de Hardware',
+            'Periféricos',
+            'Cables y Conectores',
+            'Software y Licencias',
+            'Equipos de Seguridad',
+            'Fuentes de Poder y UPS',
+            'Refacciones y Repuestos',
+            'Consumibles'
+        ]
+        
+        # Verificar cuáles tipos ya existen
+        cur.execute('SELECT "tipo_modelo" FROM "tipos_pieza"')
+        tipos_existentes = [row['tipo_modelo'] for row in cur.fetchall()]
+        
+        # Insertar solo los tipos que no existen
+        tipos_insertados = 0
+        for tipo in tipos_predeterminados:
+            if tipo not in tipos_existentes:
+                cur.execute(
+                    'INSERT INTO "tipos_pieza" ("tipo_modelo") VALUES (%s)',
+                    (tipo,)
+                )
+                tipos_insertados += 1
+        
+        conn.commit()
+        cur.close()
+        
+        return jsonify({
+            "mensaje": f"Se inicializaron {tipos_insertados} nuevos tipos de producto",
+            "tipos_insertados": tipos_insertados,
+            "total_tipos": len(tipos_predeterminados)
+        })
+        
+    except Exception as e:
+        print(f"Error en /inicializar_tipos: {e}")
+        return jsonify({"error": f"Error al inicializar tipos: {str(e)}"}), 500
+    finally:
+        if conn:
+            conn.close()
+
+# ------------------------------------------------------------------
 # API: OBTENER TODOS LOS PRODUCTOS
 # ------------------------------------------------------------------
 @app.route('/api/inventario/productos', methods=['GET'])
@@ -359,6 +442,46 @@ def agregar_producto():
     finally:
         if conn:
             conn.close()
+# ------------------------------------------------------------------
+# API: ELIMINAR PRODUCTO (NUEVO)
+# ------------------------------------------------------------------
+@app.route('/api/inventario/productos/<int:producto_id>', methods=['DELETE'])
+@protected_route
+def eliminar_producto(producto_id):
+    conn = None
+    try:
+        if session.get('role') != 'admin':
+            return jsonify({"error": "Solo administradores pueden eliminar productos"}), 403
+
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({"error": "No se pudo conectar a la base de datos"}), 500
+            
+        cur = conn.cursor(cursor_factory=DictCursor)
+        
+        # Verificar si tiene seriales
+        cur.execute('SELECT COUNT(*) as total FROM seriales WHERE producto_id = %s', (producto_id,))
+        if cur.fetchone()['total'] > 0:
+            return jsonify({"error": "Elimina primero los seriales de este producto"}), 400
+        
+        # Obtener nombre para el mensaje
+        cur.execute('SELECT nombre FROM productos WHERE producto_id = %s', (producto_id,))
+        producto = cur.fetchone()
+        if not producto:
+            return jsonify({"error": "Producto no encontrado"}), 404
+        
+        # Eliminar
+        cur.execute('DELETE FROM productos WHERE producto_id = %s', (producto_id,))
+        conn.commit()
+        
+        return jsonify({"mensaje": f"Producto '{producto['nombre']}' eliminado"})
+        
+    except Exception as e:
+        print(f"Error eliminando producto: {e}")
+        return jsonify({"error": f"Error de base de datos: {str(e)}"}), 500
+    finally:
+        if conn:
+            conn.close()
 
 # ------------------------------------------------------------------
 # API: INGRESAR NUEVO SERIAL
@@ -410,7 +533,7 @@ def agregar_serial():
             conn.close()
 
 # ------------------------------------------------------------------
-# API: OBTENER SERIALES POR PRODUCTO
+# API: OBTENER SERIALES POR PRODUCTO (TODOS LOS ESTADOS)
 # ------------------------------------------------------------------
 @app.route('/api/inventario/seriales/<int:producto_id>', methods=['GET'])
 @protected_route
@@ -425,10 +548,11 @@ def obtener_seriales_por_producto(producto_id):
         
         query = """
         SELECT "serial_id", "codigo_unico_serial", "estado", 
-               TO_CHAR("fecha_registro", 'YYYY-MM-DD HH24:MI') AS ultima_actividad
+               TO_CHAR("fecha_registro", 'YYYY-MM-DD HH24:MI') AS fecha_ingreso,
+               "notas"
         FROM "seriales" 
-        WHERE "producto_id" = %s AND "estado" = 'ALMACEN'
-        ORDER BY "codigo_unico_serial";
+        WHERE "producto_id" = %s
+        ORDER BY "estado", "codigo_unico_serial";
         """
         
         cur.execute(query, (producto_id,))
@@ -446,12 +570,202 @@ def obtener_seriales_por_producto(producto_id):
             conn.close()
 
 # ------------------------------------------------------------------
+# API: ACTUALIZAR ESTADO DE SERIAL
+# ------------------------------------------------------------------
+@app.route('/api/inventario/serial/<int:serial_id>', methods=['PUT'])
+@protected_route
+def actualizar_estado_serial(serial_id):
+    """Actualizar el estado de un serial (INSTALADO, DAÑADO, RETIRADO)"""
+    conn = None
+    try:
+        data = request.get_json()
+        
+        if not data or 'estado' not in data:
+            return jsonify({"error": "Faltan datos (estado)"}), 400
+
+        nuevo_estado = data['estado']
+        notas = data.get('notas', '')
+        
+        # Validar estado
+        estados_permitidos = ['ALMACEN', 'INSTALADO', 'DAÑADO', 'RETIRADO']
+        if nuevo_estado not in estados_permitidos:
+            return jsonify({"error": f"Estado no válido. Permitidos: {estados_permitidos}"}), 400
+
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({"error": "No se pudo conectar a la base de datos"}), 500
+            
+        cur = conn.cursor(cursor_factory=DictCursor)
+        
+        update_query = """
+        UPDATE "seriales" 
+        SET "estado" = %s, "notas" = %s, "fecha_actualizacion" = CURRENT_TIMESTAMP
+        WHERE "serial_id" = %s
+        RETURNING "serial_id", "codigo_unico_serial", "estado";
+        """
+        cur.execute(update_query, (nuevo_estado, notas, serial_id))
+        
+        result = cur.fetchone()
+        
+        if not result:
+            return jsonify({"error": "Serial no encontrado"}), 404
+            
+        conn.commit()
+        cur.close()
+        
+        return jsonify({
+            "mensaje": f"Serial {result['codigo_unico_serial']} actualizado a {nuevo_estado}",
+            "serial": dict(result)
+        })
+        
+    except Exception as e:
+        print(f"Error de DB en /serial (PUT): {e}")
+        return jsonify({"error": f"Error de base de datos: {str(e)}"}), 500
+    finally:
+        if conn:
+            conn.close()
+
+# ------------------------------------------------------------------
+# API: ELIMINAR SERIAL (SOLO ADMIN)
+# ------------------------------------------------------------------
+@app.route('/api/inventario/serial/<int:serial_id>', methods=['DELETE'])
+@protected_route
+def eliminar_serial(serial_id):
+    """Eliminar un serial permanentemente (solo administradores)"""
+    conn = None
+    try:
+        # Verificar si es administrador
+        if session.get('role') != 'admin':
+            return jsonify({"error": "Solo administradores pueden eliminar seriales"}), 403
+
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({"error": "No se pudo conectar a la base de datos"}), 500
+            
+        cur = conn.cursor(cursor_factory=DictCursor)
+        
+        # Primero obtener información del serial para el mensaje
+        cur.execute('SELECT "codigo_unico_serial" FROM "seriales" WHERE "serial_id" = %s', (serial_id,))
+        serial = cur.fetchone()
+        
+        if not serial:
+            return jsonify({"error": "Serial no encontrado"}), 404
+        
+        # Eliminar el serial
+        delete_query = 'DELETE FROM "seriales" WHERE "serial_id" = %s'
+        cur.execute(delete_query, (serial_id,))
+        
+        conn.commit()
+        cur.close()
+        
+        return jsonify({
+            "mensaje": f"Serial {serial['codigo_unico_serial']} eliminado permanentemente"
+        })
+        
+    except Exception as e:
+        print(f"Error de DB en /serial (DELETE): {e}")
+        return jsonify({"error": f"Error de base de datos: {str(e)}"}), 500
+    finally:
+        if conn:
+            conn.close()
+
+# ------------------------------------------------------------------
+# 🔧 CONSULTAS ESPECÍFICAS PARA SOLUCIONES LÓGICAS
+# ------------------------------------------------------------------
+
+@app.route('/api/inventario/stock_bajo', methods=['GET'])
+@protected_route
+def obtener_stock_bajo():
+    """Obtener productos con stock bajo (alerta) - PARA SOLUCIONES LÓGICAS"""
+    conn = None
+    try:
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({"error": "No se pudo conectar a la base de datos"}), 500
+            
+        cur = conn.cursor(cursor_factory=DictCursor)
+        
+        query = """
+        SELECT 
+            p.producto_id,
+            p.nombre,
+            p.codigo_sku,
+            tp.tipo_modelo,
+            COUNT(s.serial_id) as stock_actual
+        FROM productos p
+        JOIN tipos_pieza tp ON p.tipo_pieza_id = tp.tipo_id
+        LEFT JOIN seriales s ON p.producto_id = s.producto_id AND s.estado = 'ALMACEN'
+        GROUP BY p.producto_id, p.nombre, p.codigo_sku, tp.tipo_modelo
+        HAVING COUNT(s.serial_id) <= 3
+        ORDER BY stock_actual ASC;
+        """
+        
+        cur.execute(query)
+        stock_bajo = cur.fetchall()
+        cur.close()
+        
+        stock_list = [dict(row) for row in stock_bajo]
+        return jsonify(stock_list)
+    
+    except Exception as e:
+        print(f"Error en /stock_bajo: {e}")
+        return jsonify({"error": f"Error al obtener stock bajo: {str(e)}"}), 500
+    finally:
+        if conn:
+            conn.close()
+
+@app.route('/api/inventario/estadisticas', methods=['GET'])
+@protected_route
+def obtener_estadisticas():
+    """Obtener estadísticas generales para el dashboard - PARA SOLUCIONES LÓGICAS"""
+    conn = None
+    try:
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({"error": "No se pudo conectar a la base de datos"}), 500
+            
+        cur = conn.cursor(cursor_factory=DictCursor)
+        
+        query = """
+        SELECT 
+            COUNT(DISTINCT p.producto_id) as total_modelos,
+            COUNT(DISTINCT s.serial_id) as total_seriales,
+            COUNT(DISTINCT CASE WHEN sub.stock_actual <= 3 THEN sub.producto_id END) as modelos_stock_bajo
+        FROM productos p
+        CROSS JOIN LATERAL (
+            SELECT 
+                p2.producto_id,
+                COUNT(s2.serial_id) as stock_actual
+            FROM productos p2
+            LEFT JOIN seriales s2 ON p2.producto_id = s2.producto_id AND s2.estado = 'ALMACEN'
+            WHERE p2.producto_id = p.producto_id
+            GROUP BY p2.producto_id
+        ) sub
+        LEFT JOIN seriales s ON p.producto_id = s.producto_id;
+        """
+        
+        cur.execute(query)
+        stats = cur.fetchone()
+        cur.close()
+        
+        return jsonify(dict(stats))
+    
+    except Exception as e:
+        print(f"Error en /estadisticas: {e}")
+        return jsonify({"error": f"Error al obtener estadísticas: {str(e)}"}), 500
+    finally:
+        if conn:
+            conn.close()
+
+# ------------------------------------------------------------------
 # INICIO DE LA APLICACIÓN
 # ------------------------------------------------------------------
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))
-    print("🚀 Iniciando servidor Flask en Render...")
+    print("🚀 Iniciando servidor Flask para Soluciones Lógicas...")
     print(f"🔐 Usuario: admin")
     print(f"🔐 Contraseña: Admin123!")
     print(f"🌐 Servidor ejecutándose en puerto: {port}")
-    app.run(debug=False, host='0.0.0.0', port=port)
+    print(f"🌐 URLs: http://localhost:{port} | http://127.0.0.1:{port}")
+    print("📦 Sistema de inventario listo para usar!")
+    app.run(debug=True, host='0.0.0.0', port=port)

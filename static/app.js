@@ -1,9 +1,9 @@
 // ====================================================================
 // CONFIGURACIÓN SEGURA - USAR MISMO DOMINIO
 // ====================================================================
-const API_BASE_URL = ""; // Usar mismo dominio
-const AUTH_URL = `/api/auth`;
-const INVENTARIO_URL = `/api/inventario`;
+const API_BASE_URL = window.location.origin; // Usar el origen actual dinámicamente
+const AUTH_URL = `${API_BASE_URL}/api/auth`;
+const INVENTARIO_URL = `${API_BASE_URL}/api/inventario`;
 
 // ====================================================================
 // ELEMENTOS DEL DOM
@@ -35,6 +35,8 @@ const closeProductModal = document.getElementById("closeProductModal");
 const productForm = document.getElementById("productForm");
 const productMessage = document.getElementById("productMessage");
 const productTypeSelect = document.getElementById("productType");
+const productNameInput = document.getElementById("productName");
+const productSKUInput = document.getElementById("productSKU");
 
 // Elementos comunes
 const addItemBtn = document.getElementById("addItemBtn");
@@ -43,10 +45,25 @@ const closeModal = document.getElementById("closeModal");
 const searchInput = document.getElementById("searchInput");
 const searchBtn = document.getElementById("searchBtn");
 
+// Elementos para gestión de seriales
 const serialsDetailModal = document.getElementById("serialsDetailModal");
 const closeSerialsModal = document.getElementById("closeSerialsModal");
 const serialsModalTitle = document.getElementById("serialsModalTitle");
 const serialsTableBody = document.getElementById("serialsTableBody");
+
+// Nuevos elementos para cambio de estado
+const changeStatusModal = document.getElementById("changeStatusModal");
+const closeStatusModal = document.getElementById("closeStatusModal");
+const newStatusSelect = document.getElementById("newStatus");
+const statusNotes = document.getElementById("statusNotes");
+const confirmStatusChange = document.getElementById("confirmStatusChange");
+const cancelStatusChange = document.getElementById("cancelStatusChange");
+const statusMessage = document.getElementById("statusMessage");
+
+// Botones de acciones rápidas
+const btnMarcarInstalados = document.getElementById("btnMarcarInstalados");
+const btnMarcarDanados = document.getElementById("btnMarcarDanados");
+const btnMarcarRetirados = document.getElementById("btnMarcarRetirados");
 
 // ====================================================================
 // VARIABLES GLOBALES OPTIMIZADAS
@@ -56,6 +73,9 @@ let ALL_PRODUCT_MODELS = [];
 let productTypesCache = null;
 let inventoryCache = null;
 let sessionCheckerInterval = null;
+let currentProductId = null;
+let currentSerialId = null;
+let selectedSerials = new Set();
 
 // ====================================================================
 // MANEJO SEGURO DE AUTENTICACIÓN
@@ -138,6 +158,7 @@ async function secureLogout() {
         ALL_PRODUCT_MODELS = [];
         productTypesCache = null;
         inventoryCache = null;
+        selectedSerials.clear();
         
         dashboard.style.display = "none";
         loginContainer.style.display = "flex";
@@ -215,16 +236,32 @@ function showLoginError(message) {
  */
 async function loadInventoryData(filter = "") {
     try {
-        const response = await secureFetch(`${INVENTARIO_URL}/stock`);
+        // Cargar inventario y estadísticas EN PARALELO
+        const [inventoryResponse, statsResponse] = await Promise.all([
+            secureFetch(`${INVENTARIO_URL}/stock`),
+            secureFetch(`${INVENTARIO_URL}/estadisticas`)
+        ]);
 
-        if (!response.ok) {
-            throw new Error(`Error HTTP: ${response.status}`);
+        if (!inventoryResponse.ok) {
+            throw new Error(`Error HTTP: ${inventoryResponse.status}`);
         }
 
-        let data = await response.json();
-        
+        let data = await inventoryResponse.json();
         inventoryCache = data;
         renderInventoryTable(data, filter);
+
+        // Actualizar estadísticas si la respuesta fue exitosa
+        if (statsResponse.ok) {
+            const stats = await statsResponse.json();
+            updateStatistics(
+                stats.total_modelos || data.length,
+                stats.modelos_stock_bajo || 0,
+                stats.total_seriales || 0
+            );
+        } else {
+            // Si falla stats, calcular desde los datos
+            updateStatisticsFromData(data);
+        }
 
     } catch (error) {
         if (error.message === "Sesión expirada") {
@@ -237,6 +274,21 @@ async function loadInventoryData(filter = "") {
 }
 
 /**
+ * Actualizar estadísticas desde los datos (fallback)
+ */
+function updateStatisticsFromData(data) {
+    let totalSeriales = 0;
+    let lowStockCount = 0;
+
+    data.forEach(item => {
+        totalSeriales += item.stock_disponible;
+        if (item.stock_disponible <= 3) lowStockCount++;
+    });
+
+    updateStatistics(data.length, lowStockCount, totalSeriales);
+}
+
+/**
  * Renderiza la tabla de inventario
  */
 function renderInventoryTable(data, filter = "") {
@@ -244,7 +296,8 @@ function renderInventoryTable(data, filter = "") {
         const lowerFilter = filter.toLowerCase();
         data = data.filter(item =>
             item.producto.toLowerCase().includes(lowerFilter) || 
-            item.codigo_sku.toLowerCase().includes(lowerFilter)
+            item.codigo_sku.toLowerCase().includes(lowerFilter) ||
+            item.tipo_pieza.toLowerCase().includes(lowerFilter)
         );
     }
 
@@ -256,6 +309,7 @@ function renderInventoryTable(data, filter = "") {
         inventoryTableBody.innerHTML = `
             <tr>
                 <td colspan="7" style="text-align: center; padding: 40px;">
+                    <i class="fas fa-search" style="font-size: 24px; margin-bottom: 10px; display: block; color: var(--color-text-secondary);"></i>
                     No se encontraron productos que coincidan con la búsqueda.
                 </td>
             </tr>
@@ -266,31 +320,34 @@ function renderInventoryTable(data, filter = "") {
 
     data.forEach((item) => {
         const row = document.createElement("tr");
-        const stockStatus = item.stock_disponible <= 5 ? "Bajo" : "Normal";
-        const statusClass = item.stock_disponible <= 5 ? "danger" : "success";
+        const stockStatus = item.stock_disponible <= 3 ? "Bajo" : item.stock_disponible === 0 ? "Agotado" : "Normal";
+        const statusClass = item.stock_disponible <= 3 ? "danger" : item.stock_disponible === 0 ? "warning" : "success";
         
-        const historialDesc = item.ultima_actividad_desc || "No hay registro";
-        const historialClass = "btn-history-link";
+        const historialDesc = item.ultima_actividad_desc || "Sin actividad reciente";
 
         totalSeriales += item.stock_disponible;
-        if (item.stock_disponible <= 5) lowStockCount++;
+        if (item.stock_disponible <= 3) lowStockCount++;
 
         row.innerHTML = `
             <td>${item.producto_id}</td>
-            <td>${item.producto}</td>
+            <td><strong>${item.producto}</strong></td>
             <td>${item.tipo_pieza}</td>
-            <td>${item.codigo_sku}</td>
+            <td><code>${item.codigo_sku}</code></td>
             <td class="stock-cell">
                 <button class="btn-stock" data-id="${item.producto_id}" data-name="${item.producto}">
-                    ${item.stock_disponible} <i class="fas fa-eye"></i>
+                    <span class="stock-badge">${item.stock_disponible}</span>
+                    <i class="fas fa-box-open"></i> Ver Seriales
                 </button>
             </td>
             <td><span class="badge badge-${statusClass}">${stockStatus}</span></td>
             <td>
-                <span class="${historialClass}" data-id="${item.producto_id}" data-name="${item.producto}">
-                    ${historialDesc}
-                </span>
+                <span class="historial-text">${historialDesc}</span>
             </td>
+            <td>  <!-- NUEVA CELDA -->
+            <button class="btn-action btn-danger" onclick="eliminarProducto(${item.producto_id}, '${item.producto.replace(/'/g, "\\'")}')" title="Eliminar producto">
+            <i class="fas fa-trash"></i>
+        </button>
+    </td>
         `;
 
         inventoryTableBody.appendChild(row);
@@ -306,8 +363,9 @@ function renderInventoryTable(data, filter = "") {
 function showInventoryError() {
     inventoryTableBody.innerHTML = `
         <tr>
-            <td colspan="7" style="text-align: center; color: #c33; padding: 40px;">
-                ❌ Error al conectar con el servidor.
+            <td colspan="7" style="text-align: center; color: var(--color-danger); padding: 40px;">
+                <i class="fas fa-exclamation-triangle" style="font-size: 24px; margin-bottom: 10px; display: block;"></i>
+                Error al conectar con el servidor. Verifica tu conexión.
             </td>
         </tr>
     `;
@@ -327,7 +385,7 @@ function attachStockButtonEvents() {
 }
 
 // ====================================================================
-// GESTIÓN DE SERIALES - SEGURO
+// GESTIÓN DE SERIALES - COMPLETA Y SEGURA
 // ====================================================================
 
 /**
@@ -344,14 +402,43 @@ async function loadComponentTypes() {
         if (!response.ok) throw new Error(`Error HTTP: ${response.status}`);
 
         const types = await response.json();
-        productTypesCache = types;
         
-        populateComponentTypes(types);
+        // Si no hay tipos, inicializar automáticamente
+        if (types.length === 0) {
+            await inicializarTiposPredeterminados();
+            // Recargar tipos
+            const newResponse = await secureFetch(`${INVENTARIO_URL}/tipos_pieza`);
+            const newTypes = await newResponse.json();
+            productTypesCache = newTypes;
+            populateComponentTypes(newTypes);
+        } else {
+            productTypesCache = types;
+            populateComponentTypes(types);
+        }
+        
         await fetchAllProductModels();
 
     } catch (error) {
         console.error("Error al cargar tipos de pieza:", error);
-        componentTypeSelect.innerHTML = '<option value="">Error al cargar Tipos</option>';
+        componentTypeSelect.innerHTML = '<option value="">Error al cargar categorías</option>';
+    }
+}
+
+/**
+ * Inicializar tipos predeterminados
+ */
+async function inicializarTiposPredeterminados() {
+    try {
+        const response = await secureFetch(`${INVENTARIO_URL}/inicializar_tipos`, {
+            method: 'POST'
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            console.log("✅ Tipos predeterminados inicializados:", result.mensaje);
+        }
+    } catch (error) {
+        console.error("Error inicializando tipos predeterminados:", error);
     }
 }
 
@@ -359,7 +446,7 @@ async function loadComponentTypes() {
  * Llena el select de tipos de componente
  */
 function populateComponentTypes(types) {
-    componentTypeSelect.innerHTML = '<option value="">-- Selecciona un Tipo --</option>';
+    componentTypeSelect.innerHTML = '<option value="">-- Selecciona una categoría --</option>';
     types.forEach((t) => {
         const option = document.createElement("option");
         option.value = t.tipo_id;
@@ -379,7 +466,7 @@ async function fetchAllProductModels() {
         ALL_PRODUCT_MODELS = await response.json();
     } catch (error) {
         console.error("Error al cargar todos los modelos:", error);
-        serialProductSelect.innerHTML = '<option value="">Error al cargar Modelos</option>';
+        serialProductSelect.innerHTML = '<option value="">Error al cargar modelos</option>';
     }
 }
 
@@ -390,16 +477,16 @@ function filterProductModels() {
     const selectedTypeId = parseInt(componentTypeSelect.value);
     
     if (!selectedTypeId) {
-        serialProductSelect.innerHTML = '<option value="">-- Selecciona un Modelo (Selecciona Tipo primero) --</option>';
+        serialProductSelect.innerHTML = '<option value="">-- Selecciona un modelo (elige categoría primero) --</option>';
         serialProductSelect.disabled = true;
         return;
     }
 
-    serialProductSelect.innerHTML = '<option value="">-- Selecciona un Modelo Específico --</option>';
+    serialProductSelect.innerHTML = '<option value="">-- Selecciona un modelo específico --</option>';
     const filteredModels = ALL_PRODUCT_MODELS.filter(model => model.tipo_pieza_id === selectedTypeId);
 
     if (filteredModels.length === 0) {
-        serialProductSelect.innerHTML = '<option value="">-- No hay modelos para este tipo --</option>';
+        serialProductSelect.innerHTML = '<option value="">-- No hay modelos para esta categoría --</option>';
     } else {
         filteredModels.forEach(model => {
             const option = document.createElement('option');
@@ -416,72 +503,244 @@ function filterProductModels() {
  * Muestra el detalle de seriales de un producto
  */
 async function showSerialsDetail(productoId, productoNombre) {
-    serialsModalTitle.textContent = `Seriales en Almacén para: ${productoNombre}`;
-    serialsTableBody.innerHTML = '<tr><td colspan="5" style="text-align: center;"><div class="loading"></div> Cargando seriales...</td></tr>';
+    currentProductId = productoId;
+    serialsModalTitle.innerHTML = `<i class="fas fa-boxes"></i> Gestión de Seriales: ${productoNombre}`;
+    serialsTableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px;"><div class="loading"></div> Cargando seriales...</td></tr>';
     serialsDetailModal.style.display = "flex";
+    selectedSerials.clear();
+    updateActionButtons();
 
     try {
         const response = await secureFetch(`${INVENTARIO_URL}/seriales/${productoId}`);
         if (!response.ok) throw new Error(`Error HTTP: ${response.status}`);
 
         const serials = await response.json();
-        renderSerialsTable(serials);
+        renderSerialsTable(serials, productoNombre);
 
     } catch (error) {
         console.error("Error al cargar seriales:", error);
-        serialsTableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #c33;">Error al obtener seriales</td></tr>';
+        serialsTableBody.innerHTML = `
+            <tr>
+                <td colspan="5" style="text-align: center; color: var(--color-danger); padding: 20px;">
+                    <i class="fas fa-exclamation-triangle"></i> Error al obtener seriales
+                </td>
+            </tr>
+        `;
     }
 }
 
 /**
- * Renderiza la tabla de seriales
+ * Renderiza la tabla de seriales con funcionalidades completas
  */
-function renderSerialsTable(serials) {
+function renderSerialsTable(serials, productoNombre) {
     serialsTableBody.innerHTML = "";
 
     if (serials.length === 0) {
-        serialsTableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px;">No hay seriales en ALMACEN para este modelo.</td></tr>';
+        serialsTableBody.innerHTML = `
+            <tr>
+                <td colspan="5" style="text-align: center; padding: 40px; color: var(--color-text-secondary);">
+                    <i class="fas fa-inbox" style="font-size: 32px; margin-bottom: 10px; display: block;"></i>
+                    No hay seriales registrados para <strong>${productoNombre}</strong>
+                </td>
+            </tr>
+        `;
         return;
     }
 
+    // Contadores por estado
+    const contadores = {
+        ALMACEN: 0,
+        INSTALADO: 0,
+        DAÑADO: 0,
+        RETIRADO: 0
+    };
+
     serials.forEach((s) => {
-        const row = serialsTableBody.insertRow();
-        row.insertCell().textContent = s.serial_id;
-        row.insertCell().textContent = s.codigo_unico_serial;
-
-        const statusCell = row.insertCell();
-        const statusClass = s.estado === 'ALMACEN' ? 'success' : s.estado === 'DAÑADO' ? 'danger' : 'warning';
-        statusCell.innerHTML = `<span class="badge badge-${statusClass}">${s.estado}</span>`;
-
-        row.insertCell().textContent = s.ultima_actividad || 'N/A';
+        contadores[s.estado]++;
         
-        const actionCell = row.insertCell();
-        actionCell.innerHTML = `<button class="action-btn view-history-btn" data-serial-id="${s.serial_id}" title="Ver historial completo">
-            <i class="fas fa-history"></i>
-        </button>`;
+        const row = document.createElement("tr");
+        row.className = `serial-row ${s.estado.toLowerCase()}`;
+        
+        // Iconos por estado
+        const estadoIconos = {
+            'ALMACEN': '🟢',
+            'INSTALADO': '🔵', 
+            'DAÑADO': '🔴',
+            'RETIRADO': '🟡'
+        };
+
+        const statusClass = s.estado === 'ALMACEN' ? 'success' : 
+                           s.estado === 'INSTALADO' ? 'primary' : 
+                           s.estado === 'DAÑADO' ? 'danger' : 'warning';
+
+        row.innerHTML = `
+            <td>${s.serial_id}</td>
+            <td><code>${s.codigo_unico_serial}</code></td>
+            <td>
+                <span class="badge badge-${statusClass}">
+                    ${estadoIconos[s.estado]} ${s.estado}
+                </span>
+            </td>
+            <td>${s.fecha_ingreso || 'N/A'}</td>
+            <td>
+                <div class="action-buttons">
+                    <button class="btn-action change-status" data-serial-id="${s.serial_id}" data-current-status="${s.estado}" title="Cambiar estado">
+                        <i class="fas fa-exchange-alt"></i>
+                    </button>
+                    ${currentUser?.role === 'admin' ? `
+                    <button class="btn-action delete-serial" data-serial-id="${s.serial_id}" data-serial-code="${s.codigo_unico_serial}" title="Eliminar serial">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                    ` : ''}
+                </div>
+            </td>
+        `;
+
+        serialsTableBody.appendChild(row);
     });
 
-    attachHistoryButtonEvents();
+    // Actualizar título con contadores
+    serialsModalTitle.innerHTML = `
+        <i class="fas fa-boxes"></i> ${productoNombre}
+        <small style="display: block; font-size: 14px; color: var(--color-text-secondary); margin-top: 5px;">
+            🟢 ${contadores.ALMACEN} Almacén | 🔵 ${contadores.INSTALADO} Instalado | 🔴 ${contadores.DAÑADO} Dañado | 🟡 ${contadores.RETIRADO} Retirado
+        </small>
+    `;
+
+    attachSerialActionEvents();
 }
 
 /**
- * Asigna eventos a los botones de historial
+ * Asigna eventos a los botones de acción de seriales
  */
-function attachHistoryButtonEvents() {
-    document.querySelectorAll(".view-history-btn").forEach((btn) => {
+function attachSerialActionEvents() {
+    // Botones de cambiar estado
+    document.querySelectorAll(".change-status").forEach((btn) => {
         btn.addEventListener("click", function () {
             const serialId = this.getAttribute("data-serial-id");
-            showSerialHistory(serialId);
+            const currentStatus = this.getAttribute("data-current-status");
+            showChangeStatusModal(serialId, currentStatus);
         });
     });
+
+    // Botones de eliminar (solo admin)
+    if (currentUser?.role === 'admin') {
+        document.querySelectorAll(".delete-serial").forEach((btn) => {
+            btn.addEventListener("click", function () {
+                const serialId = this.getAttribute("data-serial-id");
+                const serialCode = this.getAttribute("data-serial-code");
+                confirmDeleteSerial(serialId, serialCode);
+            });
+        });
+    }
 }
 
 /**
- * Muestra el historial completo de un serial
+ * Muestra el modal para cambiar estado de serial
  */
-async function showSerialHistory(serialId) {
-    alert(`📋 Historial del Serial ID: ${serialId}\n\nEsta funcionalidad estará disponible en la próxima versión.`);
+function showChangeStatusModal(serialId, currentStatus) {
+    currentSerialId = serialId;
+    newStatusSelect.value = "";
+    statusNotes.value = "";
+    statusMessage.style.display = "none";
+    
+    changeStatusModal.style.display = "flex";
 }
+
+/**
+ * Confirma el cambio de estado de un serial
+ */
+confirmStatusChange.addEventListener("click", async () => {
+    const nuevoEstado = newStatusSelect.value;
+    const notas = statusNotes.value.trim();
+
+    if (!nuevoEstado) {
+        showMessage(statusMessage, "❌ Por favor selecciona un estado", "danger");
+        return;
+    }
+
+    try {
+        const response = await secureFetch(`${INVENTARIO_URL}/serial/${currentSerialId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                estado: nuevoEstado,
+                notas: notas
+            })
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            showMessage(statusMessage, `✅ ${result.mensaje}`, "success");
+            
+            // Recargar los seriales después de 1.5 segundos
+            setTimeout(() => {
+                changeStatusModal.style.display = "none";
+                showSerialsDetail(currentProductId, serialsModalTitle.textContent.split(': ')[1]);
+            }, 1500);
+        } else {
+            showMessage(statusMessage, `❌ ${result.error}`, "danger");
+        }
+    } catch (error) {
+        console.error("Error al cambiar estado:", error);
+        showMessage(statusMessage, "❌ Error de conexión con el servidor", "danger");
+    }
+});
+
+/**
+ * Cancela el cambio de estado
+ */
+cancelStatusChange.addEventListener("click", () => {
+    changeStatusModal.style.display = "none";
+});
+
+/**
+ * Confirma la eliminación de un serial
+ */
+function confirmDeleteSerial(serialId, serialCode) {
+    if (confirm(`¿Estás seguro de que quieres eliminar permanentemente el serial:\n\n"${serialCode}"?\n\nEsta acción no se puede deshacer.`)) {
+        deleteSerial(serialId);
+    }
+}
+
+/**
+ * Elimina un serial
+ */
+async function deleteSerial(serialId) {
+    try {
+        const response = await secureFetch(`${INVENTARIO_URL}/serial/${serialId}`, {
+            method: "DELETE"
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            alert(`✅ ${result.mensaje}`);
+            // Recargar los seriales
+            showSerialsDetail(currentProductId, serialsModalTitle.textContent.split(': ')[1]);
+        } else {
+            alert(`❌ ${result.error}`);
+        }
+    } catch (error) {
+        console.error("Error al eliminar serial:", error);
+        alert("❌ Error de conexión con el servidor");
+    }
+}
+
+/**
+ * Actualiza la visibilidad de los botones de acción rápida
+ */
+function updateActionButtons() {
+    const hasSelection = selectedSerials.size > 0;
+    btnMarcarInstalados.style.display = hasSelection ? 'inline-block' : 'none';
+    btnMarcarDanados.style.display = hasSelection ? 'inline-block' : 'none';
+    btnMarcarRetirados.style.display = hasSelection ? 'inline-block' : 'none';
+}
+
+// ====================================================================
+// REGISTRO DE SERIALES
+// ====================================================================
 
 /**
  * Registra un nuevo serial en la base de datos
@@ -491,7 +750,7 @@ serialForm.addEventListener("submit", async (e) => {
     serialMessage.style.display = "none";
 
     if (!componentTypeSelect.value || !serialProductSelect.value) {
-        showMessage(serialMessage, "❌ Por favor selecciona tanto el Tipo como el Modelo", "danger");
+        showMessage(serialMessage, "❌ Por favor selecciona tanto la categoría como el modelo", "danger");
         return;
     }
 
@@ -557,15 +816,26 @@ async function loadProductTypes() {
         }
 
         const response = await secureFetch(`${INVENTARIO_URL}/tipos_pieza`);
-        if (!response.ok) throw new Error('Error al cargar tipos');
+        if (!response.ok) throw new Error('Error al cargar categorías');
         
         const types = await response.json();
-        productTypesCache = types;
-        populateProductTypes(types);
+        
+        // Si no hay tipos, inicializar automáticamente
+        if (types.length === 0) {
+            await inicializarTiposPredeterminados();
+            // Recargar tipos
+            const newResponse = await secureFetch(`${INVENTARIO_URL}/tipos_pieza`);
+            const newTypes = await newResponse.json();
+            productTypesCache = newTypes;
+            populateProductTypes(newTypes);
+        } else {
+            productTypesCache = types;
+            populateProductTypes(types);
+        }
         
     } catch (error) {
-        console.error("Error al cargar tipos para producto:", error);
-        productTypeSelect.innerHTML = '<option value="">Error al cargar tipos</option>';
+        console.error("Error al cargar categorías para producto:", error);
+        productTypeSelect.innerHTML = '<option value="">Error al cargar categorías</option>';
     }
 }
 
@@ -573,13 +843,32 @@ async function loadProductTypes() {
  * Llena el select de tipos para productos
  */
 function populateProductTypes(types) {
-    productTypeSelect.innerHTML = '<option value="">-- Selecciona un Tipo --</option>';
+    productTypeSelect.innerHTML = '<option value="">-- Selecciona una categoría --</option>';
     types.forEach((t) => {
         const option = document.createElement("option");
         option.value = t.tipo_id;
         option.textContent = t.tipo_modelo;
         productTypeSelect.appendChild(option);
     });
+}
+
+/**
+ * Sugerir SKU basado en el nombre del producto
+ */
+function sugerirSKU(nombre) {
+    if (!nombre) return '';
+    
+    const palabras = nombre.split(' ').filter(palabra => palabra.length > 0);
+    let skuSugerido = '';
+    
+    for (let i = 0; i < Math.min(palabras.length, 3); i++) {
+        skuSugerido += palabras[i].substring(0, 3).toUpperCase();
+        if (i < Math.min(palabras.length, 3) - 1) {
+            skuSugerido += '-';
+        }
+    }
+    
+    return skuSugerido;
 }
 
 /**
@@ -590,10 +879,10 @@ productForm.addEventListener("submit", async (e) => {
     productMessage.style.display = "none";
 
     const newProduct = {
-        nombre: document.getElementById("productName").value.trim(),
+        nombre: productNameInput.value.trim(),
         descripcion: document.getElementById("productDescription").value.trim(),
         tipo_pieza_id: parseInt(productTypeSelect.value),
-        codigo_sku: document.getElementById("productSKU").value.trim()
+        codigo_sku: productSKUInput.value.trim()
     };
 
     if (!newProduct.nombre || !newProduct.tipo_pieza_id || !newProduct.codigo_sku) {
@@ -615,9 +904,12 @@ productForm.addEventListener("submit", async (e) => {
             productForm.reset();
             
             ALL_PRODUCT_MODELS = [];
+            productTypesCache = null;
             inventoryCache = null;
+            
             await fetchAllProductModels();
             loadInventoryData();
+            loadComponentTypes();
             
             setTimeout(() => {
                 productModal.style.display = "none";
@@ -631,6 +923,34 @@ productForm.addEventListener("submit", async (e) => {
         showMessage(productMessage, "❌ Error de conexión con el servidor", "danger");
     }
 });
+
+// ====================================================================
+// ELIMINAR PRODUCTO
+// ====================================================================
+
+async function eliminarProducto(productoId, productoNombre) {
+    if (!confirm(`¿Eliminar el producto "${productoNombre}"?\n\nEsta acción no se puede deshacer.`)) {
+        return;
+    }
+
+    try {
+        const response = await secureFetch(`${INVENTARIO_URL}/productos/${productoId}`, {
+            method: "DELETE"
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            alert(`✅ ${result.mensaje}`);
+            loadInventoryData();
+        } else {
+            alert(`❌ ${result.error}`);
+        }
+    } catch (error) {
+        console.error("Error eliminando producto:", error);
+        alert("❌ Error de conexión");
+    }
+}
 
 // ====================================================================
 // FUNCIONES AUXILIARES
@@ -656,10 +976,18 @@ addItemBtn.addEventListener("click", () => {
     itemModal.style.display = "flex";
     serialForm.reset();
     serialMessage.style.display = "none";
-    componentTypeSelect.innerHTML = '<option value="">-- Selecciona un Tipo --</option>';
-    serialProductSelect.innerHTML = '<option value="">-- Selecciona un Modelo (Selecciona Tipo primero) --</option>';
+    componentTypeSelect.innerHTML = '<option value="">-- Selecciona una categoría --</option>';
+    serialProductSelect.innerHTML = '<option value="">-- Selecciona un modelo (elige categoría primero) --</option>';
     serialProductSelect.disabled = true;
     loadComponentTypes();
+});
+
+// Sugerir SKU cuando se escribe el nombre del producto
+productNameInput.addEventListener("input", function() {
+    if (!productSKUInput.value) {
+        const skuSugerido = sugerirSKU(this.value);
+        productSKUInput.placeholder = `Ej: ${skuSugerido || 'SKU-PRODUCTO'}`;
+    }
 });
 
 componentTypeSelect.addEventListener('change', filterProductModels);
@@ -676,10 +1004,15 @@ closeSerialsModal.addEventListener("click", () => {
     serialsDetailModal.style.display = "none";
 });
 
+closeStatusModal.addEventListener("click", () => {
+    changeStatusModal.style.display = "none";
+});
+
 window.addEventListener("click", (e) => {
     if (e.target === itemModal) itemModal.style.display = "none";
     if (e.target === productModal) productModal.style.display = "none";
     if (e.target === serialsDetailModal) serialsDetailModal.style.display = "none";
+    if (e.target === changeStatusModal) changeStatusModal.style.display = "none";
 });
 
 searchBtn.addEventListener("click", () => {
@@ -714,5 +1047,67 @@ document.addEventListener("DOMContentLoaded", async () => {
         dashboard.style.display = "none";
     }
     
-    console.log("✅ Sistema de inventario seguro inicializado");
+    console.log("🚀 Sistema de inventario para Soluciones Lógicas inicializado");
 });
+
+// Agregar estilos CSS dinámicos para mejor visualización
+const dynamicStyles = `
+<style>
+.stock-badge {
+    background: var(--color-primary);
+    color: white;
+    border-radius: 12px;
+    padding: 2px 8px;
+    font-size: 12px;
+    font-weight: bold;
+    margin-right: 8px;
+}
+
+.btn-stock {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.serial-row.almacen { background: rgba(0, 255, 136, 0.05); }
+.serial-row.instalado { background: rgba(0, 102, 255, 0.05); }
+.serial-row.dañado { background: rgba(255, 68, 68, 0.05); }
+.serial-row.retirado { background: rgba(255, 170, 0, 0.05); }
+
+.action-buttons {
+    display: flex;
+    gap: 5px;
+}
+
+.btn-action {
+    padding: 6px 10px;
+    border: none;
+    border-radius: var(--border-radius-sm);
+    cursor: pointer;
+    font-size: 12px;
+    transition: var(--transition);
+}
+
+.btn-action.change-status {
+    background: var(--color-primary);
+    color: white;
+}
+
+.btn-action.delete-serial {
+    background: var(--color-danger);
+    color: white;
+}
+
+.btn-action:hover {
+    transform: scale(1.1);
+    opacity: 0.9;
+}
+
+.historial-text {
+    color: var(--color-text-secondary);
+    font-size: 13px;
+}
+</style>
+`;
+
+document.head.insertAdjacentHTML('beforeend', dynamicStyles);

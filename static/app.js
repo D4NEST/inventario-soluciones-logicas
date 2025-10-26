@@ -197,8 +197,9 @@ function setupLogoHoverAnimations() {
 // MANEJO SEGURO DE AUTENTICACIÓN
 // ====================================================================
 
+
 /**
- * Login seguro
+ * Login seguro - CORREGIDO
  */
 async function secureLogin(username, password) {
     try {
@@ -218,8 +219,10 @@ async function secureLogin(username, password) {
             userInitial.textContent = currentUser.name.charAt(0);
             userName.textContent = currentUser.name;
 
-            // Usar animación para mostrar el dashboard
-            showDashboardWithAnimation();
+            // CORRECCIÓN: Transición correcta entre pantallas
+            document.getElementById('loginScreen').classList.remove('active');
+            document.getElementById('dashboardScreen').classList.add('active');
+            
             loginError.style.display = "none";
 
             loadInventoryData();

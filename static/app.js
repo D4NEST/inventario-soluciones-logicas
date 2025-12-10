@@ -1,12 +1,15 @@
 // ====================================================================
 // CONFIGURACIÓN SEGURA - USAR MISMO DOMINIO
 // ====================================================================
-const API_BASE_URL = window.location.origin; // Usar el origen actual dinámicamente
+const API_BASE_URL = window.location.origin;
 const AUTH_URL = `${API_BASE_URL}/api/auth`;
 const INVENTARIO_URL = `${API_BASE_URL}/api/inventario`;
 
+console.log("🚀 Sistema de inventario inicializando...");
+console.log("🌐 API Base URL:", API_BASE_URL);
+
 // ====================================================================
-// ELEMENTOS DEL DOM - ACTUALIZADOS
+// ELEMENTOS DEL DOM - ACTUALIZADOS Y VERIFICADOS
 // ====================================================================
 const loginScreen = document.getElementById("loginScreen");
 const dashboardScreen = document.getElementById("dashboardScreen");
@@ -34,9 +37,19 @@ const productModal = document.getElementById("productModal");
 const closeProductModal = document.getElementById("closeProductModal");
 const productForm = document.getElementById("productForm");
 const productMessage = document.getElementById("productMessage");
-const productTypeSelect = document.getElementById("productType");
+const productTypeSelect = document.getElementById("productTypeSelect"); // ✅ CORREGIDO
 const productNameInput = document.getElementById("productName");
 const productSKUInput = document.getElementById("productSKU");
+const productDescription = document.getElementById("productDescription");
+
+// Elementos para crear nueva categoría
+const categoryModal = document.getElementById("categoryModal");
+const closeCategoryModal = document.getElementById("closeCategoryModal");
+const categoryForm = document.getElementById("categoryForm");
+const categoryMessage = document.getElementById("categoryMessage");
+const categoryNameInput = document.getElementById("categoryName");
+const addNewCategoryBtn = document.getElementById("addNewCategoryBtn");
+const newCategoryBtn = document.getElementById("newCategoryBtn"); // ✅ BOTÓN ALTERNATIVO
 
 // Elementos comunes
 const addItemBtn = document.getElementById("addItemBtn");
@@ -78,18 +91,53 @@ let currentSerialId = null;
 let selectedSerials = new Set();
 
 // ====================================================================
-// ANIMACIONES DEL LOGO - INTEGRADAS Y CORREGIDAS
+// VERIFICACIÓN DE ELEMENTOS DOM
 // ====================================================================
+function verificarElementosDOM() {
+    console.log("🔍 Verificando elementos DOM críticos:");
+    
+    const elementos = {
+        loginScreen,
+        dashboardScreen,
+        loginForm,
+        productTypeSelect,
+        productModal,
+        categoryModal,
+        addProductBtn,
+        newCategoryBtn,
+         // addNewCategoryBtn,  //
+        itemModal,
+        serialsDetailModal
+    };
+    
+    let todosExisten = true;
+    for (const [nombre, elemento] of Object.entries(elementos)) {
+        if (!elemento) {
+            console.error(`❌ Elemento no encontrado: ${nombre}`);
+            todosExisten = false;
+        } else {
+            console.log(`✅ ${nombre}: OK`);
+        }
+    }
+    
+    return todosExisten;
+}
 
+// ====================================================================
+// ANIMACIONES DEL LOGO
+// ====================================================================
 function initializeAnimations() {
-    // Solo ejecutar animaciones si estamos en la pantalla de login
-    if (loginScreen.classList.contains('active')) {
+    if (loginScreen && loginScreen.classList.contains('active')) {
         runLoginAnimation();
     }
 }
 
 function runLoginAnimation() {
-    // Timeline para animación coordinada
+    if (typeof anime === 'undefined') {
+        console.warn("⚠️ Anime.js no cargado, omitiendo animaciones");
+        return;
+    }
+    
     const timeline = anime.timeline({
         duration: 1200,
         easing: 'easeOutElastic(1, .8)'
@@ -119,7 +167,7 @@ function runLoginAnimation() {
 
 function animateDashboardLogo() {
     const dashboardLogo = document.getElementById('dashboardLogo');
-    if (dashboardLogo) {
+    if (dashboardLogo && typeof anime !== 'undefined') {
         anime({
             targets: '#dashboardLogo',
             scale: [0.8, 1],
@@ -131,23 +179,28 @@ function animateDashboardLogo() {
 }
 
 // ====================================================================
-// FUNCIONES DE TRANSICIÓN MEJORADAS - CORREGIDAS
+// FUNCIONES DE TRANSICIÓN MEJORADAS
 // ====================================================================
-
-/**
- * Transición suave de Login a Dashboard - CORREGIDA
- */
 function showDashboardWithAnimation() {
-    // Primero preparar el dashboard (oculto pero en el DOM)
+    if (!loginScreen || !dashboardScreen) return;
+    
     dashboardScreen.style.opacity = '0';
     dashboardScreen.style.display = 'flex';
     
-    // Animación coordinada
+    if (typeof anime === 'undefined') {
+        // Fallback sin animaciones
+        loginScreen.style.display = 'none';
+        loginScreen.classList.remove('active');
+        dashboardScreen.style.display = 'flex';
+        dashboardScreen.classList.add('active');
+        dashboardScreen.style.opacity = '1';
+        return;
+    }
+    
     const timeline = anime.timeline({
         duration: 800,
         easing: 'easeInOutQuad',
         complete: function() {
-            // Limpiar estilos inline después de la animación
             loginScreen.style.display = 'none';
             dashboardScreen.style.opacity = '';
         }
@@ -174,19 +227,25 @@ function showDashboardWithAnimation() {
     });
 }
 
-/**
- * Transición suave de Dashboard a Login - CORREGIDA  
- */
 function showLoginWithAnimation() {
-    // Primero preparar el login (oculto pero en el DOM)
+    if (!loginScreen || !dashboardScreen) return;
+    
     loginScreen.style.opacity = '0';
     loginScreen.style.display = 'flex';
+    
+    if (typeof anime === 'undefined') {
+        dashboardScreen.style.display = 'none';
+        dashboardScreen.classList.remove('active');
+        loginScreen.style.display = 'flex';
+        loginScreen.classList.add('active');
+        loginScreen.style.opacity = '1';
+        return;
+    }
     
     const timeline = anime.timeline({
         duration: 800,
         easing: 'easeInOutQuad',
         complete: function() {
-            // Limpiar estilos inline después de la animación
             dashboardScreen.style.display = 'none';
             loginScreen.style.opacity = '';
         }
@@ -213,45 +272,17 @@ function showLoginWithAnimation() {
     });
 }
 
-// Animación sutil al hacer hover en el logo
-function setupLogoHoverAnimations() {
-    document.addEventListener('mouseover', function(e) {
-        if (e.target.classList.contains('logo')) {
-            anime({
-                targets: e.target,
-                scale: 1.05,
-                duration: 300,
-                easing: 'easeOutQuad'
-            });
-        }
-    });
-
-    document.addEventListener('mouseout', function(e) {
-        if (e.target.classList.contains('logo')) {
-            anime({
-                targets: e.target,
-                scale: 1,
-                duration: 300,
-                easing: 'easeOutQuad'
-            });
-        }
-    });
-}
-
 // ====================================================================
-// MANEJO SEGURO DE AUTENTICACIÓN - CORREGIDO
+// MANEJO SEGURO DE AUTENTICACIÓN
 // ====================================================================
-
-/**
- * Login seguro - ACTUALIZADO con transición mejorada
- */
 async function secureLogin(username, password) {
     try {
-        // Mostrar estado de carga en el botón
         const loginBtn = loginForm.querySelector('button[type="submit"]');
         const originalText = loginBtn.innerHTML;
         loginBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> VERIFICANDO...';
         loginBtn.disabled = true;
+        
+        console.log(`🔐 Intentando login para: ${username}`);
         
         const response = await fetch(`${AUTH_URL}/login`, {
             method: "POST",
@@ -262,6 +293,7 @@ async function secureLogin(username, password) {
             credentials: 'include'
         });
 
+        console.log(`📨 Respuesta login: ${response.status}`);
         const result = await response.json();
 
         if (response.ok) {
@@ -269,12 +301,9 @@ async function secureLogin(username, password) {
             userInitial.textContent = currentUser.name.charAt(0);
             userName.textContent = currentUser.name;
 
-            // USAR LA NUEVA TRANSICIÓN MEJORADA
             showDashboardWithAnimation();
-            
             loginError.style.display = "none";
 
-            // Cargar datos del dashboard después de la transición
             setTimeout(() => {
                 loadInventoryData();
                 loadComponentTypes();
@@ -282,46 +311,47 @@ async function secureLogin(username, password) {
             }, 600);
             
             startSessionChecker();
+            console.log("✅ Login exitoso");
         } else {
-            showLoginError(result.error);
+            console.error(`❌ Error login: ${result.error}`);
+            showLoginError(result.error || "Credenciales incorrectas");
         }
     } catch (error) {
-        console.error("Error de login:", error);
+        console.error("❌ Error de conexión en login:", error);
         showLoginError("Error de conexión con el servidor");
     } finally {
-        // Restaurar botón
         const loginBtn = loginForm.querySelector('button[type="submit"]');
-        loginBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> INICIAR SESIÓN';
-        loginBtn.disabled = false;
+        if (loginBtn) {
+            loginBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> INICIAR SESIÓN';
+            loginBtn.disabled = false;
+        }
     }
 }
 
-/**
- * Verificar sesión activa
- */
 async function checkSession() {
     try {
+        console.log("🔍 Verificando sesión activa...");
         const response = await fetch(`${AUTH_URL}/check`, {
             credentials: 'include'
         });
         
-        if (response.ok) {
-            const data = await response.json();
-            if (data.authenticated) {
-                currentUser = data.user;
-                return true;
-            }
+        console.log(`📨 Respuesta check: ${response.status}`);
+        const data = await response.json();
+        
+        if (response.ok && data.authenticated) {
+            currentUser = data.user;
+            console.log("✅ Sesión activa encontrada");
+            return true;
+        } else {
+            console.log("❌ No hay sesión activa:", data);
+            return false;
         }
     } catch (error) {
-        console.error("Error verificando sesión:", error);
+        console.error("❌ Error verificando sesión:", error);
+        return false;
     }
-    
-    return false;
 }
 
-/**
- * Logout seguro - ACTUALIZADO con transición mejorada
- */
 async function secureLogout() {
     try {
         await fetch(`${AUTH_URL}/logout`, {
@@ -337,24 +367,20 @@ async function secureLogout() {
         inventoryCache = null;
         selectedSerials.clear();
         
-        // USAR LA NUEVA TRANSICIÓN MEJORADA
         showLoginWithAnimation();
         
-        loginForm.reset();
-        loginError.style.display = "none";
+        if (loginForm) loginForm.reset();
+        if (loginError) loginError.style.display = "none";
         
-        // Reiniciar animación del login después de la transición
         setTimeout(() => {
             runLoginAnimation();
         }, 600);
         
         stopSessionChecker();
+        console.log("✅ Logout completado");
     }
 }
 
-/**
- * Verificador periódico de sesión
- */
 function startSessionChecker() {
     sessionCheckerInterval = setInterval(async () => {
         const isValid = await checkSession();
@@ -362,7 +388,7 @@ function startSessionChecker() {
             alert("Sesión expirada. Por favor ingresa nuevamente.");
             secureLogout();
         }
-    }, 5 * 60 * 1000); // 5 minutos
+    }, 5 * 60 * 1000);
 }
 
 function stopSessionChecker() {
@@ -372,18 +398,17 @@ function stopSessionChecker() {
     }
 }
 
-/**
- * Fetch seguro con manejo de autenticación
- */
 async function secureFetch(url, options = {}) {
     const config = {
         ...options,
         credentials: 'include'
     };
     
+    console.log(`📤 Fetch a: ${url}`);
     const response = await fetch(url, config);
     
     if (response.status === 401) {
+        console.warn("🔒 Sesión expirada, haciendo logout...");
         secureLogout();
         throw new Error("Sesión expirada");
     }
@@ -394,49 +419,53 @@ async function secureFetch(url, options = {}) {
 // ====================================================================
 // AUTENTICACIÓN - EVENT LISTENERS
 // ====================================================================
-
-loginForm.addEventListener("submit", (e) => {
-    e.preventDefault();
-    const username = document.getElementById("username").value;
-    const password = document.getElementById("password").value;
-    
-    secureLogin(username, password);
-});
-
-logoutBtn.addEventListener("click", secureLogout);
-
-function showLoginError(message) {
-    loginError.textContent = message;
-    loginError.style.display = "block";
-    
-    // Animación de error
-    anime({
-        targets: '#loginError',
-        scale: [0.8, 1],
-        duration: 300,
-        easing: 'easeOutBack'
+if (loginForm) {
+    loginForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const username = document.getElementById("username").value;
+        const password = document.getElementById("password").value;
+        
+        secureLogin(username, password);
     });
 }
 
-// ====================================================================
-// GESTIÓN DE INVENTARIO - OPTIMIZADO Y SEGURO
-// ====================================================================
+if (logoutBtn) {
+    logoutBtn.addEventListener("click", secureLogout);
+}
 
-/**
- * Carga el inventario desde la base de datos con caché
- */
+function showLoginError(message) {
+    if (!loginError) return;
+    
+    loginError.textContent = message;
+    loginError.style.display = "block";
+    
+    if (typeof anime !== 'undefined') {
+        anime({
+            targets: '#loginError',
+            scale: [0.8, 1],
+            duration: 300,
+            easing: 'easeOutBack'
+        });
+    }
+}
+
+// ====================================================================
+// GESTIÓN DE INVENTARIO
+// ====================================================================
 async function loadInventoryData(filter = "") {
     try {
-        // Mostrar animación de carga
-        inventoryTableBody.innerHTML = `
-            <tr>
-                <td colspan="8" style="text-align: center; padding: 40px;">
-                    <div class="loading"></div> Cargando inventario...
-                </td>
-            </tr>
-        `;
+        console.log(`📊 Cargando inventario (filtro: "${filter}")`);
+        
+        if (inventoryTableBody) {
+            inventoryTableBody.innerHTML = `
+                <tr>
+                    <td colspan="8" style="text-align: center; padding: 40px;">
+                        <div class="loading"></div> Cargando inventario...
+                    </td>
+                </tr>
+            `;
+        }
 
-        // Cargar inventario y estadísticas EN PARALELO
         const [inventoryResponse, statsResponse] = await Promise.all([
             secureFetch(`${INVENTARIO_URL}/stock`),
             secureFetch(`${INVENTARIO_URL}/estadisticas`)
@@ -450,7 +479,6 @@ async function loadInventoryData(filter = "") {
         inventoryCache = data;
         renderInventoryTable(data, filter);
 
-        // Actualizar estadísticas si la respuesta fue exitosa
         if (statsResponse.ok) {
             const stats = await statsResponse.json();
             updateStatistics(
@@ -459,23 +487,19 @@ async function loadInventoryData(filter = "") {
                 stats.total_seriales || 0
             );
         } else {
-            // Si falla stats, calcular desde los datos
             updateStatisticsFromData(data);
         }
 
     } catch (error) {
+        console.error("❌ Error al cargar inventario:", error);
         if (error.message === "Sesión expirada") {
             showLoginError("Sesión expirada");
         } else {
-            console.error("Error al cargar inventario:", error);
             showInventoryError();
         }
     }
 }
 
-/**
- * Actualizar estadísticas desde los datos (fallback)
- */
 function updateStatisticsFromData(data) {
     let totalSeriales = 0;
     let lowStockCount = 0;
@@ -488,10 +512,9 @@ function updateStatisticsFromData(data) {
     updateStatistics(data.length, lowStockCount, totalSeriales);
 }
 
-/**
- * Renderiza la tabla de inventario
- */
 function renderInventoryTable(data, filter = "") {
+    if (!inventoryTableBody) return;
+    
     if (filter) {
         const lowerFilter = filter.toLowerCase();
         data = data.filter(item =>
@@ -552,25 +575,25 @@ function renderInventoryTable(data, filter = "") {
 
         inventoryTableBody.appendChild(row);
         
-        // Animación de aparición escalonada
-        anime({
-            targets: row,
-            opacity: [0, 1],
-            translateY: [20, 0],
-            duration: 400,
-            delay: index * 50,
-            easing: 'easeOutQuad'
-        });
+        if (typeof anime !== 'undefined') {
+            anime({
+                targets: row,
+                opacity: [0, 1],
+                translateY: [20, 0],
+                duration: 400,
+                delay: index * 50,
+                easing: 'easeOutQuad'
+            });
+        }
     });
 
     updateStatistics(data.length, lowStockCount, totalSeriales);
     attachStockButtonEvents();
 }
 
-/**
- * Muestra error en la tabla de inventario
- */
 function showInventoryError() {
+    if (!inventoryTableBody) return;
+    
     inventoryTableBody.innerHTML = `
         <tr>
             <td colspan="8" style="text-align: center; color: var(--color-danger); padding: 40px;">
@@ -581,9 +604,6 @@ function showInventoryError() {
     `;
 }
 
-/**
- * Asigna eventos a los botones de stock
- */
 function attachStockButtonEvents() {
     document.querySelectorAll(".btn-stock").forEach((btn) => {
         btn.addEventListener("click", function () {
@@ -595,14 +615,17 @@ function attachStockButtonEvents() {
 }
 
 // ====================================================================
-// GESTIÓN DE SERIALES - COMPLETA Y SEGURA
+// GESTIÓN DE SERIALES
 // ====================================================================
-
-/**
- * Carga la lista de TIPOS DE PIEZA para el primer select del modal
- */
 async function loadComponentTypes() {
     try {
+        console.log("📦 Cargando tipos de pieza...");
+        
+        if (!componentTypeSelect) {
+            console.error("❌ componentTypeSelect no encontrado");
+            return;
+        }
+
         if (productTypesCache) {
             populateComponentTypes(productTypesCache);
             return;
@@ -612,11 +635,10 @@ async function loadComponentTypes() {
         if (!response.ok) throw new Error(`Error HTTP: ${response.status}`);
 
         const types = await response.json();
+        console.log(`✅ Tipos cargados: ${types.length}`);
         
-        // Si no hay tipos, inicializar automáticamente
         if (types.length === 0) {
             await inicializarTiposPredeterminados();
-            // Recargar tipos
             const newResponse = await secureFetch(`${INVENTARIO_URL}/tipos_pieza`);
             const newTypes = await newResponse.json();
             productTypesCache = newTypes;
@@ -629,16 +651,16 @@ async function loadComponentTypes() {
         await fetchAllProductModels();
 
     } catch (error) {
-        console.error("Error al cargar tipos de pieza:", error);
-        componentTypeSelect.innerHTML = '<option value="">Error al cargar categorías</option>';
+        console.error("❌ Error al cargar tipos de pieza:", error);
+        if (componentTypeSelect) {
+            componentTypeSelect.innerHTML = '<option value="">Error al cargar categorías</option>';
+        }
     }
 }
 
-/**
- * Inicializar tipos predeterminados
- */
 async function inicializarTiposPredeterminados() {
     try {
+        console.log("📦 Inicializando tipos predeterminados...");
         const response = await secureFetch(`${INVENTARIO_URL}/inicializar_tipos`, {
             method: 'POST'
         });
@@ -652,10 +674,9 @@ async function inicializarTiposPredeterminados() {
     }
 }
 
-/**
- * Llena el select de tipos de componente
- */
 function populateComponentTypes(types) {
+    if (!componentTypeSelect) return;
+    
     componentTypeSelect.innerHTML = '<option value="">-- Selecciona una categoría --</option>';
     types.forEach((t) => {
         const option = document.createElement("option");
@@ -665,25 +686,25 @@ function populateComponentTypes(types) {
     });
 }
 
-/**
- * Carga todos los modelos para filtrar localmente
- */
 async function fetchAllProductModels() {
     try {
+        console.log("📦 Cargando todos los modelos...");
         const response = await secureFetch(`${INVENTARIO_URL}/productos`);
         if (!response.ok) throw new Error(`Error HTTP: ${response.status}`);
         
         ALL_PRODUCT_MODELS = await response.json();
+        console.log(`✅ Modelos cargados: ${ALL_PRODUCT_MODELS.length}`);
     } catch (error) {
-        console.error("Error al cargar todos los modelos:", error);
-        serialProductSelect.innerHTML = '<option value="">Error al cargar modelos</option>';
+        console.error("❌ Error al cargar todos los modelos:", error);
+        if (serialProductSelect) {
+            serialProductSelect.innerHTML = '<option value="">Error al cargar modelos</option>';
+        }
     }
 }
 
-/**
- * Filtra y llena el segundo desplegable (MODELO ESPECÍFICO)
- */
 function filterProductModels() {
+    if (!serialProductSelect) return;
+    
     const selectedTypeId = parseInt(componentTypeSelect.value);
     
     if (!selectedTypeId) {
@@ -709,25 +730,33 @@ function filterProductModels() {
     serialProductSelect.disabled = false;
 }
 
-/**
- * Muestra el detalle de seriales de un producto
- */
 async function showSerialsDetail(productoId, productoNombre) {
     currentProductId = productoId;
-    serialsModalTitle.innerHTML = `<i class="fas fa-boxes"></i> Gestión de Seriales: ${productoNombre}`;
-    serialsTableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px;"><div class="loading"></div> Cargando seriales...</td></tr>';
-    serialsDetailModal.style.display = "flex";
+    
+    if (serialsModalTitle) {
+        serialsModalTitle.innerHTML = `<i class="fas fa-boxes"></i> Gestión de Seriales: ${productoNombre}`;
+    }
+    
+    if (serialsTableBody) {
+        serialsTableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px;"><div class="loading"></div> Cargando seriales...</td></tr>';
+    }
+    
+    if (serialsDetailModal) {
+        serialsDetailModal.style.display = "flex";
+    }
+    
     selectedSerials.clear();
     updateActionButtons();
 
-    // Animación de entrada del modal
-    anime({
-        targets: serialsDetailModal,
-        opacity: [0, 1],
-        scale: [0.9, 1],
-        duration: 400,
-        easing: 'easeOutBack'
-    });
+    if (typeof anime !== 'undefined') {
+        anime({
+            targets: serialsDetailModal,
+            opacity: [0, 1],
+            scale: [0.9, 1],
+            duration: 400,
+            easing: 'easeOutBack'
+        });
+    }
 
     try {
         const response = await secureFetch(`${INVENTARIO_URL}/seriales/${productoId}`);
@@ -737,21 +766,22 @@ async function showSerialsDetail(productoId, productoNombre) {
         renderSerialsTable(serials, productoNombre);
 
     } catch (error) {
-        console.error("Error al cargar seriales:", error);
-        serialsTableBody.innerHTML = `
-            <tr>
-                <td colspan="5" style="text-align: center; color: var(--color-danger); padding: 20px;">
-                    <i class="fas fa-exclamation-triangle"></i> Error al obtener seriales
-                </td>
-            </tr>
-        `;
+        console.error("❌ Error al cargar seriales:", error);
+        if (serialsTableBody) {
+            serialsTableBody.innerHTML = `
+                <tr>
+                    <td colspan="5" style="text-align: center; color: var(--color-danger); padding: 20px;">
+                        <i class="fas fa-exclamation-triangle"></i> Error al obtener seriales
+                    </td>
+                </tr>
+            `;
+        }
     }
 }
 
-/**
- * Renderiza la tabla de seriales con funcionalidades completas
- */
 function renderSerialsTable(serials, productoNombre) {
+    if (!serialsTableBody) return;
+    
     serialsTableBody.innerHTML = "";
 
     if (serials.length === 0) {
@@ -766,7 +796,6 @@ function renderSerialsTable(serials, productoNombre) {
         return;
     }
 
-    // Contadores por estado
     const contadores = {
         ALMACEN: 0,
         INSTALADO: 0,
@@ -780,14 +809,6 @@ function renderSerialsTable(serials, productoNombre) {
         const row = document.createElement("tr");
         row.className = `serial-row ${s.estado.toLowerCase()}`;
         
-        // Iconos por estado
-        const estadoIconos = {
-            'ALMACEN': '🟢',
-            'INSTALADO': '🔵', 
-            'DAÑADO': '🔴',
-            'RETIRADO': '🟡'
-        };
-
         const statusClass = s.estado === 'ALMACEN' ? 'success' : 
                            s.estado === 'INSTALADO' ? 'primary' : 
                            s.estado === 'DAÑADO' ? 'danger' : 'warning';
@@ -797,7 +818,7 @@ function renderSerialsTable(serials, productoNombre) {
             <td><code>${s.codigo_unico_serial}</code></td>
             <td>
                 <span class="badge badge-${statusClass}">
-                    ${estadoIconos[s.estado]} ${s.estado}
+                    ${s.estado === 'ALMACEN' ? '🟢' : s.estado === 'INSTALADO' ? '🔵' : s.estado === 'DAÑADO' ? '🔴' : '🟡'} ${s.estado}
                 </span>
             </td>
             <td>${s.fecha_ingreso || 'N/A'}</td>
@@ -817,33 +838,31 @@ function renderSerialsTable(serials, productoNombre) {
 
         serialsTableBody.appendChild(row);
         
-        // Animación de entrada escalonada
-        anime({
-            targets: row,
-            opacity: [0, 1],
-            translateX: [-20, 0],
-            duration: 300,
-            delay: index * 80,
-            easing: 'easeOutQuad'
-        });
+        if (typeof anime !== 'undefined') {
+            anime({
+                targets: row,
+                opacity: [0, 1],
+                translateX: [-20, 0],
+                duration: 300,
+                delay: index * 80,
+                easing: 'easeOutQuad'
+            });
+        }
     });
 
-    // Actualizar título con contadores
-    serialsModalTitle.innerHTML = `
-        <i class="fas fa-boxes"></i> ${productoNombre}
-        <small style="display: block; font-size: 14px; color: var(--color-text-secondary); margin-top: 5px;">
-            🟢 ${contadores.ALMACEN} Almacén | 🔵 ${contadores.INSTALADO} Instalado | 🔴 ${contadores.DAÑADO} Dañado | 🟡 ${contadores.RETIRADO} Retirado
-        </small>
-    `;
+    if (serialsModalTitle) {
+        serialsModalTitle.innerHTML = `
+            <i class="fas fa-boxes"></i> ${productoNombre}
+            <small style="display: block; font-size: 14px; color: var(--color-text-secondary); margin-top: 5px;">
+                🟢 ${contadores.ALMACEN} Almacén | 🔵 ${contadores.INSTALADO} Instalado | 🔴 ${contadores.DAÑADO} Dañado | 🟡 ${contadores.RETIRADO} Retirado
+            </small>
+        `;
+    }
 
     attachSerialActionEvents();
 }
 
-/**
- * Asigna eventos a los botones de acción de seriales
- */
 function attachSerialActionEvents() {
-    // Botones de cambiar estado
     document.querySelectorAll(".change-status").forEach((btn) => {
         btn.addEventListener("click", function () {
             const serialId = this.getAttribute("data-serial-id");
@@ -852,7 +871,6 @@ function attachSerialActionEvents() {
         });
     });
 
-    // Botones de eliminar (solo admin)
     if (currentUser?.role === 'admin') {
         document.querySelectorAll(".delete-serial").forEach((btn) => {
             btn.addEventListener("click", function () {
@@ -864,105 +882,107 @@ function attachSerialActionEvents() {
     }
 }
 
-/**
- * Muestra el modal para cambiar estado de serial
- */
 function showChangeStatusModal(serialId, currentStatus) {
     currentSerialId = serialId;
-    newStatusSelect.value = "";
-    statusNotes.value = "";
-    statusMessage.style.display = "none";
     
-    changeStatusModal.style.display = "flex";
+    if (newStatusSelect) newStatusSelect.value = "";
+    if (statusNotes) statusNotes.value = "";
+    if (statusMessage) statusMessage.style.display = "none";
     
-    // Animación de entrada
-    anime({
-        targets: changeStatusModal,
-        opacity: [0, 1],
-        scale: [0.8, 1],
-        duration: 400,
-        easing: 'easeOutBack'
+    if (changeStatusModal) {
+        changeStatusModal.style.display = "flex";
+    }
+    
+    if (typeof anime !== 'undefined') {
+        anime({
+            targets: changeStatusModal,
+            opacity: [0, 1],
+            scale: [0.8, 1],
+            duration: 400,
+            easing: 'easeOutBack'
+        });
+    }
+}
+
+if (confirmStatusChange) {
+    confirmStatusChange.addEventListener("click", async () => {
+        if (!newStatusSelect || !statusMessage) return;
+        
+        const nuevoEstado = newStatusSelect.value;
+        const notas = statusNotes ? statusNotes.value.trim() : "";
+
+        if (!nuevoEstado) {
+            showMessage(statusMessage, "❌ Por favor selecciona un estado", "danger");
+            return;
+        }
+
+        try {
+            const response = await secureFetch(`${INVENTARIO_URL}/serial/${currentSerialId}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    estado: nuevoEstado,
+                    notas: notas
+                })
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                showMessage(statusMessage, `✅ ${result.mensaje}`, "success");
+                
+                if (typeof anime !== 'undefined') {
+                    anime({
+                        targets: statusMessage,
+                        scale: [0.8, 1],
+                        duration: 300,
+                        easing: 'easeOutBack'
+                    });
+                }
+                
+                setTimeout(() => {
+                    if (changeStatusModal) changeStatusModal.style.display = "none";
+                    if (serialsModalTitle) {
+                        showSerialsDetail(currentProductId, serialsModalTitle.textContent.split(': ')[1]);
+                    }
+                }, 1500);
+            } else {
+                showMessage(statusMessage, `❌ ${result.error}`, "danger");
+            }
+        } catch (error) {
+            console.error("Error al cambiar estado:", error);
+            showMessage(statusMessage, "❌ Error de conexión con el servidor", "danger");
+        }
     });
 }
 
-/**
- * Confirma el cambio de estado de un serial
- */
-confirmStatusChange.addEventListener("click", async () => {
-    const nuevoEstado = newStatusSelect.value;
-    const notas = statusNotes.value.trim();
-
-    if (!nuevoEstado) {
-        showMessage(statusMessage, "❌ Por favor selecciona un estado", "danger");
-        return;
-    }
-
-    try {
-        const response = await secureFetch(`${INVENTARIO_URL}/serial/${currentSerialId}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                estado: nuevoEstado,
-                notas: notas
-            })
-        });
-
-        const result = await response.json();
-
-        if (response.ok) {
-            showMessage(statusMessage, `✅ ${result.mensaje}`, "success");
-            
-            // Animación de éxito
+if (cancelStatusChange) {
+    cancelStatusChange.addEventListener("click", () => {
+        if (!changeStatusModal) return;
+        
+        if (typeof anime !== 'undefined') {
             anime({
-                targets: statusMessage,
-                scale: [0.8, 1],
+                targets: changeStatusModal,
+                opacity: [1, 0],
+                scale: [1, 0.8],
                 duration: 300,
-                easing: 'easeOutBack'
+                easing: 'easeInQuad',
+                complete: function() {
+                    changeStatusModal.style.display = "none";
+                }
             });
-            
-            // Recargar los seriales después de 1.5 segundos
-            setTimeout(() => {
-                changeStatusModal.style.display = "none";
-                showSerialsDetail(currentProductId, serialsModalTitle.textContent.split(': ')[1]);
-            }, 1500);
         } else {
-            showMessage(statusMessage, `❌ ${result.error}`, "danger");
-        }
-    } catch (error) {
-        console.error("Error al cambiar estado:", error);
-        showMessage(statusMessage, "❌ Error de conexión con el servidor", "danger");
-    }
-});
-
-/**
- * Cancela el cambio de estado
- */
-cancelStatusChange.addEventListener("click", () => {
-    // Animación de salida
-    anime({
-        targets: changeStatusModal,
-        opacity: [1, 0],
-        scale: [1, 0.8],
-        duration: 300,
-        easing: 'easeInQuad',
-        complete: function() {
             changeStatusModal.style.display = "none";
         }
     });
-});
+}
 
-/**
- * Confirma la eliminación de un serial
- */
 function confirmDeleteSerial(serialId, serialCode) {
     if (confirm(`¿Estás seguro de que quieres eliminar permanentemente el serial:\n\n"${serialCode}"?\n\nEsta acción no se puede deshacer.`)) {
         deleteSerial(serialId);
     }
 }
 
-/**
- * Elimina un serial
- */
 async function deleteSerial(serialId) {
     try {
         const response = await secureFetch(`${INVENTARIO_URL}/serial/${serialId}`, {
@@ -973,8 +993,9 @@ async function deleteSerial(serialId) {
 
         if (response.ok) {
             alert(`✅ ${result.mensaje}`);
-            // Recargar los seriales
-            showSerialsDetail(currentProductId, serialsModalTitle.textContent.split(': ')[1]);
+            if (serialsModalTitle) {
+                showSerialsDetail(currentProductId, serialsModalTitle.textContent.split(': ')[1]);
+            }
         } else {
             alert(`❌ ${result.error}`);
         }
@@ -984,10 +1005,9 @@ async function deleteSerial(serialId) {
     }
 }
 
-/**
- * Actualiza la visibilidad de los botones de acción rápida
- */
 function updateActionButtons() {
+    if (!btnMarcarInstalados || !btnMarcarDanados || !btnMarcarRetirados) return;
+    
     const hasSelection = selectedSerials.size > 0;
     btnMarcarInstalados.style.display = hasSelection ? 'inline-block' : 'none';
     btnMarcarDanados.style.display = hasSelection ? 'inline-block' : 'none';
@@ -997,94 +1017,107 @@ function updateActionButtons() {
 // ====================================================================
 // REGISTRO DE SERIALES
 // ====================================================================
+if (serialForm) {
+    serialForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        if (serialMessage) serialMessage.style.display = "none";
 
-/**
- * Registra un nuevo serial en la base de datos
- */
-serialForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    serialMessage.style.display = "none";
+        if (!componentTypeSelect || !serialProductSelect) {
+            showMessage(serialMessage, "❌ Error en formulario", "danger");
+            return;
+        }
 
-    if (!componentTypeSelect.value || !serialProductSelect.value) {
-        showMessage(serialMessage, "❌ Por favor selecciona tanto la categoría como el modelo", "danger");
-        return;
-    }
+        if (!componentTypeSelect.value || !serialProductSelect.value) {
+            showMessage(serialMessage, "❌ Por favor selecciona tanto la categoría como el modelo", "danger");
+            return;
+        }
 
-    const newSerial = {
-        producto_id: Number.parseInt(serialProductSelect.value),
-        codigo_unico_serial: serialCode.value.trim(),
-    };
+        const newSerial = {
+            producto_id: Number.parseInt(serialProductSelect.value),
+            codigo_unico_serial: serialCode ? serialCode.value.trim() : "",
+        };
 
-    if (!newSerial.codigo_unico_serial) {
-        showMessage(serialMessage, "❌ Por favor ingresa un código de serial", "danger");
-        return;
-    }
+        if (!newSerial.codigo_unico_serial) {
+            showMessage(serialMessage, "❌ Por favor ingresa un código de serial", "danger");
+            return;
+        }
 
-    try {
-        const response = await secureFetch(`${INVENTARIO_URL}/serial`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(newSerial),
-        });
+        try {
+            const response = await secureFetch(`${INVENTARIO_URL}/serial`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(newSerial),
+            });
 
-        const result = await response.json();
+            const result = await response.json();
 
-        if (response.ok) {
-            showMessage(serialMessage, `✅ ${result.mensaje}`, "success");
-            serialForm.reset();
-            inventoryCache = null;
-            loadInventoryData();
-            
-            // Animación de éxito
+            if (response.ok) {
+                showMessage(serialMessage, `✅ ${result.mensaje}`, "success");
+                serialForm.reset();
+                inventoryCache = null;
+                loadInventoryData();
+                
+                if (typeof anime !== 'undefined') {
+                    anime({
+                        targets: serialMessage,
+                        scale: [0.8, 1],
+                        duration: 300,
+                        easing: 'easeOutBack'
+                    });
+                }
+                
+                setTimeout(() => {
+                    if (itemModal) itemModal.style.display = "none";
+                    if (serialMessage) serialMessage.style.display = "none";
+                }, 2000);
+            } else {
+                showMessage(serialMessage, `❌ ${result.error}`, "danger");
+            }
+        } catch (error) {
+            console.error("Error al registrar serial:", error);
+            showMessage(serialMessage, "❌ Error de conexión con el servidor", "danger");
+        }
+    });
+}
+
+// ====================================================================
+// GESTIÓN DE PRODUCTOS
+// ====================================================================
+if (addProductBtn) {
+    addProductBtn.addEventListener("click", () => {
+        console.log("🆕 Abriendo modal de producto...");
+        if (productModal) {
+            productModal.style.display = "flex";
+        }
+        if (productForm) productForm.reset();
+        if (productMessage) productMessage.style.display = "none";
+        loadProductTypes();
+        
+        if (typeof anime !== 'undefined') {
             anime({
-                targets: serialMessage,
-                scale: [0.8, 1],
-                duration: 300,
+                targets: productModal,
+                opacity: [0, 1],
+                scale: [0.9, 1],
+                duration: 400,
                 easing: 'easeOutBack'
             });
-            
-            setTimeout(() => {
-                itemModal.style.display = "none";
-                serialMessage.style.display = "none";
-            }, 2000);
-        } else {
-            showMessage(serialMessage, `❌ ${result.error}`, "danger");
         }
-    } catch (error) {
-        console.error("Error al registrar serial:", error);
-        showMessage(serialMessage, "❌ Error de conexión con el servidor", "danger");
-    }
-});
-
-// ====================================================================
-// GESTIÓN DE PRODUCTOS - SEGURO
-// ====================================================================
-
-/**
- * Abre el modal para agregar nuevo producto
- */
-addProductBtn.addEventListener("click", () => {
-    productModal.style.display = "flex";
-    productForm.reset();
-    productMessage.style.display = "none";
-    loadProductTypes();
-    
-    // Animación de entrada
-    anime({
-        targets: productModal,
-        opacity: [0, 1],
-        scale: [0.9, 1],
-        duration: 400,
-        easing: 'easeOutBack'
     });
-});
+}
 
-/**
- * Carga los tipos de pieza para el modal de productos
- */
 async function loadProductTypes() {
     try {
+        console.log("📦 Cargando categorías para producto...");
+        
+        if (!productTypeSelect) {
+            console.error("❌ productTypeSelect no encontrado");
+            return;
+        }
+
+        productTypeSelect.innerHTML = '<option value="">Cargando categorías...</option>';
+        
         if (productTypesCache) {
+            console.log("📦 Usando caché de categorías:", productTypesCache.length);
             populateProductTypes(productTypesCache);
             return;
         }
@@ -1093,11 +1126,11 @@ async function loadProductTypes() {
         if (!response.ok) throw new Error('Error al cargar categorías');
         
         const types = await response.json();
+        console.log(`✅ Categorías cargadas: ${types.length} tipos`);
         
-        // Si no hay tipos, inicializar automáticamente
         if (types.length === 0) {
+            console.log("📦 No hay categorías, inicializando predeterminadas...");
             await inicializarTiposPredeterminados();
-            // Recargar tipos
             const newResponse = await secureFetch(`${INVENTARIO_URL}/tipos_pieza`);
             const newTypes = await newResponse.json();
             productTypesCache = newTypes;
@@ -1108,15 +1141,19 @@ async function loadProductTypes() {
         }
         
     } catch (error) {
-        console.error("Error al cargar categorías para producto:", error);
-        productTypeSelect.innerHTML = '<option value="">Error al cargar categorías</option>';
+        console.error("❌ Error al cargar categorías:", error);
+        if (productTypeSelect) {
+            productTypeSelect.innerHTML = `
+                <option value="">Error cargando categorías</option>
+                <option value="reload" onclick="location.reload()">↻ Recargar página</option>
+            `;
+        }
     }
 }
 
-/**
- * Llena el select de tipos para productos
- */
 function populateProductTypes(types) {
+    if (!productTypeSelect) return;
+    
     productTypeSelect.innerHTML = '<option value="">-- Selecciona una categoría --</option>';
     types.forEach((t) => {
         const option = document.createElement("option");
@@ -1124,11 +1161,10 @@ function populateProductTypes(types) {
         option.textContent = t.tipo_modelo;
         productTypeSelect.appendChild(option);
     });
+    
+    console.log(`✅ Select poblado con ${types.length} categorías`);
 }
 
-/**
- * Sugerir SKU basado en el nombre del producto
- */
 function sugerirSKU(nombre) {
     if (!nombre) return '';
     
@@ -1145,71 +1181,75 @@ function sugerirSKU(nombre) {
     return skuSugerido;
 }
 
-/**
- * Registra un nuevo producto en la base de datos
- */
-productForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    productMessage.style.display = "none";
+if (productForm) {
+    productForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        if (productMessage) productMessage.style.display = "none";
 
-    const newProduct = {
-        nombre: productNameInput.value.trim(),
-        descripcion: document.getElementById("productDescription").value.trim(),
-        tipo_pieza_id: parseInt(productTypeSelect.value),
-        codigo_sku: productSKUInput.value.trim()
-    };
-
-    if (!newProduct.nombre || !newProduct.tipo_pieza_id || !newProduct.codigo_sku) {
-        showMessage(productMessage, "❌ Por favor completa todos los campos requeridos", "danger");
-        return;
-    }
-
-    try {
-        const response = await secureFetch(`${INVENTARIO_URL}/productos`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(newProduct),
-        });
-
-        const result = await response.json();
-
-        if (response.ok) {
-            showMessage(productMessage, `✅ ${result.mensaje}`, "success");
-            productForm.reset();
-            
-            ALL_PRODUCT_MODELS = [];
-            productTypesCache = null;
-            inventoryCache = null;
-            
-            await fetchAllProductModels();
-            loadInventoryData();
-            loadComponentTypes();
-            
-            // Animación de éxito
-            anime({
-                targets: productMessage,
-                scale: [0.8, 1],
-                duration: 300,
-                easing: 'easeOutBack'
-            });
-            
-            setTimeout(() => {
-                productModal.style.display = "none";
-                productMessage.style.display = "none";
-            }, 2000);
-        } else {
-            showMessage(productMessage, `❌ ${result.error}`, "danger");
+        if (!productNameInput || !productTypeSelect || !productSKUInput) {
+            showMessage(productMessage, "❌ Error en formulario", "danger");
+            return;
         }
-    } catch (error) {
-        console.error("Error al registrar producto:", error);
-        showMessage(productMessage, "❌ Error de conexión con el servidor", "danger");
-    }
-});
+
+        const newProduct = {
+            nombre: productNameInput.value.trim(),
+            descripcion: productDescription ? productDescription.value.trim() : "",
+            tipo_pieza_id: parseInt(productTypeSelect.value),
+            codigo_sku: productSKUInput.value.trim()
+        };
+
+        if (!newProduct.nombre || !newProduct.tipo_pieza_id || !newProduct.codigo_sku) {
+            showMessage(productMessage, "❌ Por favor completa todos los campos requeridos", "danger");
+            return;
+        }
+
+        try {
+            const response = await secureFetch(`${INVENTARIO_URL}/productos`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(newProduct),
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                showMessage(productMessage, `✅ ${result.mensaje}`, "success");
+                productForm.reset();
+                
+                ALL_PRODUCT_MODELS = [];
+                productTypesCache = null;
+                inventoryCache = null;
+                
+                await fetchAllProductModels();
+                loadInventoryData();
+                loadComponentTypes();
+                
+                if (typeof anime !== 'undefined') {
+                    anime({
+                        targets: productMessage,
+                        scale: [0.8, 1],
+                        duration: 300,
+                        easing: 'easeOutBack'
+                    });
+                }
+                
+                setTimeout(() => {
+                    if (productModal) productModal.style.display = "none";
+                    if (productMessage) productMessage.style.display = "none";
+                }, 2000);
+            } else {
+                showMessage(productMessage, `❌ ${result.error}`, "danger");
+            }
+        } catch (error) {
+            console.error("Error al registrar producto:", error);
+            showMessage(productMessage, "❌ Error de conexión con el servidor", "danger");
+        }
+    });
+}
 
 // ====================================================================
 // ELIMINAR PRODUCTO
 // ====================================================================
-
 async function eliminarProducto(productoId, productoNombre) {
     if (!confirm(`¿Eliminar el producto "${productoNombre}"?\n\nEsta acción no se puede deshacer.`)) {
         return;
@@ -1237,15 +1277,18 @@ async function eliminarProducto(productoId, productoNombre) {
 // ====================================================================
 // FUNCIONES AUXILIARES
 // ====================================================================
-
 function updateStatistics(totalModelos, lowStockCount, totalSeriales) {
-    // Animación de contadores
     animateCounter(totalItems, totalModelos);
     animateCounter(lowStockItems, lowStockCount);
     animateCounter(totalValue, totalSeriales);
 }
 
 function animateCounter(element, targetValue) {
+    if (!element || typeof anime === 'undefined') {
+        if (element) element.textContent = targetValue;
+        return;
+    }
+    
     const currentValue = parseInt(element.textContent) || 0;
     anime({
         targets: { value: currentValue },
@@ -1259,6 +1302,8 @@ function animateCounter(element, targetValue) {
 }
 
 function showMessage(element, message, type) {
+    if (!element) return;
+    
     element.textContent = message;
     element.className = `alert alert-${type}`;
     element.style.display = "block";
@@ -1267,128 +1312,291 @@ function showMessage(element, message, type) {
 // ====================================================================
 // EVENTOS DE MODALES Y BÚSQUEDA
 // ====================================================================
-
-addItemBtn.addEventListener("click", () => {
-    itemModal.style.display = "flex";
-    serialForm.reset();
-    serialMessage.style.display = "none";
-    componentTypeSelect.innerHTML = '<option value="">-- Selecciona una categoría --</option>';
-    serialProductSelect.innerHTML = '<option value="">-- Selecciona un modelo (elige categoría primero) --</option>';
-    serialProductSelect.disabled = true;
-    loadComponentTypes();
-    
-    // Animación de entrada
-    anime({
-        targets: itemModal,
-        opacity: [0, 1],
-        scale: [0.9, 1],
-        duration: 400,
-        easing: 'easeOutBack'
-    });
-});
-
-// Sugerir SKU cuando se escribe el nombre del producto
-productNameInput.addEventListener("input", function() {
-    if (!productSKUInput.value) {
-        const skuSugerido = sugerirSKU(this.value);
-        productSKUInput.placeholder = `Ej: ${skuSugerido || 'SKU-PRODUCTO'}`;
-    }
-});
-
-componentTypeSelect.addEventListener('change', filterProductModels);
-
-// Función para cerrar modales con animación
-function closeModalWithAnimation(modal) {
-    anime({
-        targets: modal,
-        opacity: [1, 0],
-        scale: [1, 0.9],
-        duration: 300,
-        easing: 'easeInQuad',
-        complete: function() {
-            modal.style.display = "none";
+if (addItemBtn) {
+    addItemBtn.addEventListener("click", () => {
+        console.log("➕ Abriendo modal para registrar serial...");
+        if (itemModal) {
+            itemModal.style.display = "flex";
+        }
+        if (serialForm) serialForm.reset();
+        if (serialMessage) serialMessage.style.display = "none";
+        if (componentTypeSelect) {
+            componentTypeSelect.innerHTML = '<option value="">-- Selecciona una categoría --</option>';
+        }
+        if (serialProductSelect) {
+            serialProductSelect.innerHTML = '<option value="">-- Selecciona un modelo (elige categoría primero) --</option>';
+            serialProductSelect.disabled = true;
+        }
+        loadComponentTypes();
+        
+        if (typeof anime !== 'undefined') {
+            anime({
+                targets: itemModal,
+                opacity: [0, 1],
+                scale: [0.9, 1],
+                duration: 400,
+                easing: 'easeOutBack'
+            });
         }
     });
 }
 
-closeModal.addEventListener("click", () => {
-    closeModalWithAnimation(itemModal);
-});
+if (productNameInput && productSKUInput) {
+    productNameInput.addEventListener("input", function() {
+        if (!productSKUInput.value) {
+            const skuSugerido = sugerirSKU(this.value);
+            productSKUInput.placeholder = `Ej: ${skuSugerido || 'SKU-PRODUCTO'}`;
+        }
+    });
+}
 
-closeProductModal.addEventListener("click", () => {
-    closeModalWithAnimation(productModal);
-});
+if (componentTypeSelect) {
+    componentTypeSelect.addEventListener('change', filterProductModels);
+}
 
-closeSerialsModal.addEventListener("click", () => {
-    closeModalWithAnimation(serialsDetailModal);
-});
+function closeModalWithAnimation(modal) {
+    if (!modal) return;
+    
+    if (typeof anime !== 'undefined') {
+        anime({
+            targets: modal,
+            opacity: [1, 0],
+            scale: [1, 0.9],
+            duration: 300,
+            easing: 'easeInQuad',
+            complete: function() {
+                modal.style.display = "none";
+            }
+        });
+    } else {
+        modal.style.display = "none";
+    }
+}
 
-closeStatusModal.addEventListener("click", () => {
-    closeModalWithAnimation(changeStatusModal);
-});
+if (closeModal) {
+    closeModal.addEventListener("click", () => {
+        closeModalWithAnimation(itemModal);
+    });
+}
 
+if (closeProductModal) {
+    closeProductModal.addEventListener("click", () => {
+        closeModalWithAnimation(productModal);
+    });
+}
+
+// Event listeners para modal de crear categoría
+if (addNewCategoryBtn) {
+    addNewCategoryBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log("🆕 Botón Nueva Categoría clickeado (1)");
+        if (categoryModal) {
+            categoryModal.style.display = "flex";
+        }
+        if (categoryForm) categoryForm.reset();
+        if (categoryMessage) categoryMessage.style.display = "none";
+        
+        if (typeof anime !== 'undefined') {
+            anime({
+                targets: categoryModal,
+                opacity: [0, 1],
+                scale: [0.9, 1],
+                duration: 400,
+                easing: 'easeOutBack'
+            });
+        }
+    });
+}
+
+if (newCategoryBtn) {
+    newCategoryBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log("🆕 Botón Nueva Categoría clickeado (2)");
+        if (categoryModal) {
+            categoryModal.style.display = "flex";
+        }
+        if (categoryForm) categoryForm.reset();
+        if (categoryMessage) categoryMessage.style.display = "none";
+        
+        if (typeof anime !== 'undefined') {
+            anime({
+                targets: categoryModal,
+                opacity: [0, 1],
+                scale: [0.9, 1],
+                duration: 400,
+                easing: 'easeOutBack'
+            });
+        }
+    });
+}
+
+if (closeCategoryModal) {
+    closeCategoryModal.addEventListener("click", () => {
+        closeModalWithAnimation(categoryModal);
+    });
+}
+
+if (closeSerialsModal) {
+    closeSerialsModal.addEventListener("click", () => {
+        closeModalWithAnimation(serialsDetailModal);
+    });
+}
+
+if (closeStatusModal) {
+    closeStatusModal.addEventListener("click", () => {
+        closeModalWithAnimation(changeStatusModal);
+    });
+}
+
+// Cerrar modal al hacer click fuera
 window.addEventListener("click", (e) => {
-    if (e.target === itemModal) closeModalWithAnimation(itemModal);
-    if (e.target === productModal) closeModalWithAnimation(productModal);
-    if (e.target === serialsDetailModal) closeModalWithAnimation(serialsDetailModal);
-    if (e.target === changeStatusModal) closeModalWithAnimation(changeStatusModal);
+    if (itemModal && e.target == itemModal) closeModalWithAnimation(itemModal);
+    if (productModal && e.target == productModal) closeModalWithAnimation(productModal);
+    if (serialsDetailModal && e.target == serialsDetailModal) closeModalWithAnimation(serialsDetailModal);
+    if (changeStatusModal && e.target == changeStatusModal) closeModalWithAnimation(changeStatusModal);
+    if (categoryModal && e.target == categoryModal) closeModalWithAnimation(categoryModal);
 });
 
-searchBtn.addEventListener("click", () => {
-    loadInventoryData(searchInput.value);
-});
+if (searchBtn) {
+    searchBtn.addEventListener("click", () => {
+        loadInventoryData(searchInput ? searchInput.value : "");
+    });
+}
 
-searchInput.addEventListener("keyup", (e) => {
-    if (e.key === "Enter") {
-        loadInventoryData(searchInput.value);
-    }
-});
+if (searchInput) {
+    searchInput.addEventListener("keyup", (e) => {
+        if (e.key === "Enter") {
+            loadInventoryData(searchInput.value);
+        }
+    });
 
-searchInput.addEventListener("input", (e) => {
-    if (e.target.value === "") {
-        loadInventoryData("");
-    }
-});
+    searchInput.addEventListener("input", (e) => {
+        if (e.target.value === "") {
+            loadInventoryData("");
+        }
+    });
+}
+
+// Registrar nueva categoría
+if (categoryForm) {
+    categoryForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        if (categoryMessage) categoryMessage.style.display = "none";
+
+        const categoryName = categoryNameInput ? categoryNameInput.value.trim() : "";
+
+        if (!categoryName) {
+            showMessage(categoryMessage, "❌ Por favor ingresa el nombre de la categoría", "danger");
+            return;
+        }
+
+        try {
+            const response = await secureFetch(`${INVENTARIO_URL}/tipos_pieza`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ tipo_modelo: categoryName }),
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                showMessage(categoryMessage, `✅ ${result.mensaje}`, "success");
+                if (categoryForm) categoryForm.reset();
+                
+                productTypesCache = null;
+                loadProductTypes();
+                loadComponentTypes();
+                
+                setTimeout(() => {
+                    if (categoryModal) categoryModal.style.display = "none";
+                }, 1500);
+            } else {
+                showMessage(categoryMessage, `❌ ${result.error}`, "danger");
+            }
+        } catch (error) {
+            console.error("Error:", error);
+            showMessage(categoryMessage, "❌ Error al crear la categoría", "danger");
+        }
+    });
+}
 
 // ====================================================================
-// INICIALIZACIÓN SEGURA - ACTUALIZADA
+// INICIALIZACIÓN SEGURA
 // ====================================================================
 document.addEventListener("DOMContentLoaded", async () => {
+    console.log("🚀 DOM completamente cargado");
+    
+    // Verificar elementos críticos
+    const domOk = verificarElementosDOM();
+    if (!domOk) {
+        console.error("❌ Elementos DOM críticos faltantes");
+        alert("Error crítico: Algunos elementos necesarios no se encontraron. Recarga la página.");
+        return;
+    }
+    
     // Asegurar que solo el login esté visible inicialmente
-    loginScreen.classList.add('active');
-    dashboardScreen.classList.remove('active');
-    
-    // Asegurar display correcto
-    loginScreen.style.display = 'flex';
-    dashboardScreen.style.display = 'none';
-    
-    // Inicializar animaciones
-    initializeAnimations();
-    setupLogoHoverAnimations();
-    
-    // Verificar sesión existente
-    const hasSession = await checkSession();
-    
-    if (hasSession && currentUser) {
-        // Si hay sesión, mostrar dashboard directamente SIN animación
-        loginScreen.classList.remove('active');
-        loginScreen.style.display = 'none';
-        dashboardScreen.classList.add('active');
-        dashboardScreen.style.display = 'flex';
-        
-        // Cargar datos del dashboard
-        loadInventoryData();
-        loadComponentTypes();
-        animateDashboardLogo();
-    } else {
-        // Si no hay sesión, asegurar que solo el login esté visible
+    if (loginScreen) {
         loginScreen.classList.add('active');
         loginScreen.style.display = 'flex';
+    }
+    
+    if (dashboardScreen) {
         dashboardScreen.classList.remove('active');
         dashboardScreen.style.display = 'none';
     }
     
-    console.log("🚀 Sistema de inventario para Soluciones Lógicas inicializado correctamente");
+    // Inicializar animaciones
+    initializeAnimations();
+    
+    // Verificar sesión existente
+    console.log("🔍 Verificando sesión existente...");
+    try {
+        const hasSession = await checkSession();
+        
+        if (hasSession && currentUser) {
+            console.log("✅ Sesión encontrada, cargando dashboard...");
+            // Mostrar dashboard directamente
+            if (loginScreen) {
+                loginScreen.classList.remove('active');
+                loginScreen.style.display = 'none';
+            }
+            if (dashboardScreen) {
+                dashboardScreen.classList.add('active');
+                dashboardScreen.style.display = 'flex';
+            }
+            
+            // Cargar datos del dashboard
+            userInitial.textContent = currentUser.name.charAt(0);
+            userName.textContent = currentUser.name;
+            
+            loadInventoryData();
+            loadComponentTypes();
+            animateDashboardLogo();
+            startSessionChecker();
+        } else {
+            console.log("❌ No hay sesión activa, mostrando login");
+            // Asegurar que solo el login esté visible
+            if (loginScreen) {
+                loginScreen.classList.add('active');
+                loginScreen.style.display = 'flex';
+            }
+            if (dashboardScreen) {
+                dashboardScreen.classList.remove('active');
+                dashboardScreen.style.display = 'none';
+            }
+        }
+    } catch (error) {
+        console.error("❌ Error verificando sesión:", error);
+        // Por seguridad, mostrar login
+        if (loginScreen) {
+            loginScreen.style.display = 'flex';
+            loginScreen.classList.add('active');
+        }
+    }
+    
+    console.log("✅ Sistema de inventario para Soluciones Lógicas inicializado correctamente");
 });
 
 // Agregar estilos CSS dinámicos para mejor visualización
@@ -1455,7 +1663,6 @@ const dynamicStyles = `
     font-size: 13px;
 }
 
-/* Animaciones para modales */
 .modal {
     transition: opacity 0.3s ease;
 }
@@ -1475,7 +1682,6 @@ const dynamicStyles = `
     100% { transform: rotate(360deg); }
 }
 
-/* Estilos para el botón de login mejorado */
 .login-btn {
     width: 100%;
     padding: 18px 30px;
@@ -1528,3 +1734,6 @@ const dynamicStyles = `
 `;
 
 document.head.insertAdjacentHTML('beforeend', dynamicStyles);
+
+// Exportar funciones globales para acceso desde HTML
+window.eliminarProducto = eliminarProducto;

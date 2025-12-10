@@ -316,17 +316,24 @@
                         </small>
                     </div>
                     
-                    <div class="form-group">
-                        <label for="productType">
-                            <i class="fas fa-cube"></i> Categoría del Producto
-                        </label>
-                        <select id="productType" class="form-control" required>
-                            <option value="">-- Selecciona una categoría --</option>
-                        </select>
-                        <small style="color: var(--color-text-secondary); font-size: 12px; margin-top: 5px;">
-                            Si no encuentras la categoría adecuada, selecciona la más similar
-                        </small>
-                    </div>
+                    <!-- NUEVO: SELECT DE CATEGORÍAS con botón para crear nueva -->
+                <div class="form-group" style="position: relative;">
+    <label for="productTypeSelect">
+        <i class="fas fa-folder"></i> Categoría del Producto
+    </label>
+    <div style="display: flex; gap: 10px; align-items: center;">
+        <select id="productTypeSelect" class="form-control" required style="flex: 1;">
+            <option value="">Cargando categorías...</option>
+        </select>
+        <button type="button" id="newCategoryBtn" class="btn btn-sm btn-outline" 
+                style="white-space: nowrap; padding: 8px 12px;">
+            <i class="fas fa-plus"></i> Nueva Categoría
+        </button>
+    </div>
+    <small style="color: var(--color-text-secondary); font-size: 12px; margin-top: 5px;">
+        Selecciona la categoría del producto o crea una nueva
+    </small>
+                </div>
                     
                     <div class="form-group">
                         <label for="productSKU">
@@ -347,7 +354,37 @@
                     <div id="productMessage" class="alert" style="display: none; margin-top: 20px;"></div>
                 </div>
             </form>
+        
+        <!-- Modal: Crear Nueva Categoría - NUEVO -->
+<div class="modal" id="categoryModal">
+    <div class="modal-content" style="max-width: 400px;">
+        <div class="modal-header">
+            <h2><i class="fas fa-folder-plus"></i> Crear Nueva Categoría</h2>
+            <button class="close-btn" id="closeCategoryModal">&times;</button>
         </div>
+        <form id="categoryForm">
+            <div style="padding: 25px;">
+                <div class="form-group">
+                    <label for="categoryName">
+                        <i class="fas fa-tag"></i> Nombre de la Categoría
+                    </label>
+                    <input type="text" id="categoryName" class="form-control" 
+                           placeholder="Ej: Computadoras, Monitores, Switches..." 
+                           required>
+                    <small style="color: var(--color-text-secondary); font-size: 12px; margin-top: 5px;">
+                        Ingresa un nombre único para la nueva categoría
+                    </small>
+                </div>
+                
+                <button type="submit" class="btn btn-block" style="margin-top: 20px;">
+                    <i class="fas fa-save"></i> Crear Categoría
+                </button>
+                
+                <div id="categoryMessage" class="alert" style="display: none; margin-top: 20px;"></div>
+            </div>
+        </form>
+    </div>
+</div></div>
     </div>
     
     <!-- Modal: Gestión de Seriales - MEJORADO -->

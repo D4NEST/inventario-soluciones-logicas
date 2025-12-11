@@ -1266,7 +1266,7 @@ def obtener_productos_detallado():
 # ====================================================================
 @app.route('/api/inventario/agregar_lote', methods=['POST', 'OPTIONS'])
 @protected_route
-def agregar_seriales_lote():
+def agregar_seriales_lote_masivo():
     """Agrega múltiples seriales de una vez para un producto"""
     if request.method == 'OPTIONS':
         return jsonify({}), 200

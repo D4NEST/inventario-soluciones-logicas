@@ -1201,7 +1201,161 @@ def obtener_producto_por_id(producto_id):
     finally:
         if conn:
             conn.close()
+# ====================================================================
+# API: OBTENER PRODUCTOS CON STOCK DETALLADO (NUEVO)
+# ====================================================================
+@app.route('/api/inventario/productos/detallado', methods=['GET', 'OPTIONS'])
+@protected_route
+def obtener_productos_detallado():
+    """Obtiene inventario con detalles de stock por estado - NUEVA VISTA"""
+    if request.method == 'OPTIONS':
+        return jsonify({}), 200
+    
+    conn = None
+    try:
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({"error": "No se pudo conectar a la base de datos"}), 500
+            
+        cur = conn.cursor(cursor_factory=DictCursor)
+        
+        query = """
+        SELECT 
+            p.producto_id,
+            p.nombre,
+            p.marca,
+            p.modelo,
+            p.codigo_sku,
+            tp.tipo_modelo as categoria,
+            -- Stock por estado
+            COUNT(s.serial_id) as total,
+            SUM(CASE WHEN s.estado = 'ALMACEN' THEN 1 ELSE 0 END) as almacen,
+            SUM(CASE WHEN s.estado = 'INSTALADO' THEN 1 ELSE 0 END) as instalado,
+            SUM(CASE WHEN s.estado = 'DAÑADO' THEN 1 ELSE 0 END) as danado,
+            SUM(CASE WHEN s.estado = 'RETIRADO' THEN 1 ELSE 0 END) as retirado,
+            -- Última actividad
+            MAX(s.fecha_registro) as ultima_entrada,
+            MAX(s.fecha_actualizacion) as ultima_actualizacion
+        FROM productos p
+        JOIN tipos_pieza tp ON p.tipo_pieza_id = tp.tipo_id
+        LEFT JOIN seriales s ON p.producto_id = s.producto_id
+        GROUP BY p.producto_id, p.nombre, p.marca, p.modelo, p.codigo_sku, tp.tipo_modelo
+        ORDER BY 
+            CASE WHEN p.marca IS NULL THEN 1 ELSE 0 END,
+            p.marca,
+            CASE WHEN p.modelo IS NULL THEN 1 ELSE 0 END,
+            p.modelo,
+            p.nombre;
+        """
+        
+        cur.execute(query)
+        productos = [dict(row) for row in cur.fetchall()]
+        cur.close()
+        
+        return jsonify(productos)
+        
+    except Exception as e:
+        print(f"❌ Error en /productos/detallado: {e}")
+        return jsonify({"error": f"Error: {str(e)}"}), 500
+    finally:
+        if conn:
+            conn.close()
 
+# ====================================================================
+# API: AGREGAR MÚLTIPLES SERIALES (NUEVO)
+# ====================================================================
+@app.route('/api/inventario/agregar_lote', methods=['POST', 'OPTIONS'])
+@protected_route
+def agregar_seriales_lote():
+    """Agrega múltiples seriales de una vez para un producto"""
+    if request.method == 'OPTIONS':
+        return jsonify({}), 200
+    
+    conn = None
+    try:
+        data = request.get_json()
+        
+        if not data or 'producto_id' not in data or 'cantidad' not in data:
+            return jsonify({"error": "Faltan datos (producto_id o cantidad)"}), 400
+
+        producto_id = data['producto_id']
+        cantidad = int(data['cantidad'])
+        estado = data.get('estado', 'ALMACEN')
+        
+        if cantidad < 1 or cantidad > 100:
+            return jsonify({"error": "Cantidad debe estar entre 1 y 100"}), 400
+        
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({"error": "No se pudo conectar a la base de datos"}), 500
+            
+        cur = conn.cursor()
+        
+        # Obtener SKU del producto
+        cur.execute('SELECT codigo_sku FROM productos WHERE producto_id = %s', (producto_id,))
+        producto = cur.fetchone()
+        
+        if not producto:
+            return jsonify({"error": f"Producto ID {producto_id} no existe"}), 404
+        
+        sku_base = producto[0]
+        
+        # Obtener último número de serial
+        cur.execute('''
+            SELECT codigo_unico_serial 
+            FROM seriales 
+            WHERE producto_id = %s 
+            AND codigo_unico_serial LIKE %s
+            ORDER BY codigo_unico_serial DESC 
+            LIMIT 1
+        ''', (producto_id, f'{sku_base}-%'))
+        
+        ultimo_serial = cur.fetchone()
+        ultimo_numero = 0
+        
+        if ultimo_serial:
+            import re
+            match = re.search(r'(\d+)$', ultimo_serial[0])
+            if match:
+                ultimo_numero = int(match.group(1))
+        
+        seriales_creados = []
+        
+        for i in range(1, cantidad + 1):
+            numero_serial = ultimo_numero + i
+            codigo_serial = f"{sku_base}-{str(numero_serial).zfill(3)}"
+            
+            # Insertar serial
+            cur.execute('''
+                INSERT INTO seriales (producto_id, codigo_unico_serial, estado)
+                VALUES (%s, %s, %s)
+                RETURNING serial_id
+            ''', (producto_id, codigo_serial, estado))
+            
+            serial_id = cur.fetchone()[0]
+            seriales_creados.append({
+                'serial_id': serial_id,
+                'codigo_serial': codigo_serial,
+                'estado': estado
+            })
+        
+        conn.commit()
+        cur.close()
+        
+        return jsonify({
+            'mensaje': f'Se agregaron {len(seriales_creados)} seriales',
+            'seriales': seriales_creados
+        })
+        
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        print(f"❌ Error agregando seriales en lote: {e}")
+        return jsonify({"error": f"Error: {str(e)}"}), 500
+    finally:
+        if conn:
+            conn.close()
+            
 # ====================================================================
 # INICIO DE LA APLICACIÓN
 # ====================================================================

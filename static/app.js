@@ -1465,6 +1465,14 @@ async function eliminarProducto(productoId, productoNombre) {
         alert("❌ Error de conexión");
     }
 }
+// ====================================================================
+// EDITAR PRODUCTO (TEMPORAL)
+// ====================================================================
+function editarProducto(productoId) {
+    console.log(`✏️ Editando producto ID: ${productoId}`);
+    alert(`Función de edición en desarrollo para producto ID: ${productoId}\n\nEsta funcionalidad permitirá modificar marca, modelo, SKU y categoría del producto.`);
+    // TODO: Implementar modal de edición completa
+}
 
 // ====================================================================
 // FUNCIONES AUXILIARES
@@ -2160,3 +2168,4 @@ window.mostrarSerialesDetalle = mostrarSerialesDetalle;
 window.agregarStockMultiple = agregarStockMultiple;
 window.cerrarModal = cerrarModal;
 window.confirmarCambioEstado = confirmarCambioEstado; // <-- Nueva función exportada
+window.editarProducto = editarProducto;

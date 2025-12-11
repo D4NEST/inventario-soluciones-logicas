@@ -37,7 +37,7 @@ const productModal = document.getElementById("productModal");
 const closeProductModal = document.getElementById("closeProductModal");
 const productForm = document.getElementById("productForm");
 const productMessage = document.getElementById("productMessage");
-const productTypeSelect = document.getElementById("productTypeSelect"); // ✅ CORREGIDO
+const productTypeSelect = document.getElementById("productTypeSelect");
 const productNameInput = document.getElementById("productName");
 const productSKUInput = document.getElementById("productSKU");
 const productDescription = document.getElementById("productDescription");
@@ -48,8 +48,7 @@ const closeCategoryModal = document.getElementById("closeCategoryModal");
 const categoryForm = document.getElementById("categoryForm");
 const categoryMessage = document.getElementById("categoryMessage");
 const categoryNameInput = document.getElementById("categoryName");
-const addNewCategoryBtn = document.getElementById("addNewCategoryBtn");
-const newCategoryBtn = document.getElementById("newCategoryBtn"); // ✅ BOTÓN ALTERNATIVO
+const newCategoryBtn = document.getElementById("newCategoryBtn");
 
 // Elementos comunes
 const addItemBtn = document.getElementById("addItemBtn");
@@ -57,6 +56,9 @@ const itemModal = document.getElementById("itemModal");
 const closeModal = document.getElementById("closeModal");
 const searchInput = document.getElementById("searchInput");
 const searchBtn = document.getElementById("searchBtn");
+
+// NUEVOS ELEMENTOS PARA LA INTERFAZ MEJORADA
+const addMultipleBtn = document.getElementById("addMultipleBtn"); // <-- NUEVO BOTÓN
 
 // Elementos para gestión de seriales
 const serialsDetailModal = document.getElementById("serialsDetailModal");
@@ -105,9 +107,9 @@ function verificarElementosDOM() {
         categoryModal,
         addProductBtn,
         newCategoryBtn,
-         // addNewCategoryBtn,  //
         itemModal,
-        serialsDetailModal
+        serialsDetailModal,
+        inventoryTableBody
     };
     
     let todosExisten = true;
@@ -305,7 +307,7 @@ async function secureLogin(username, password) {
             loginError.style.display = "none";
 
             setTimeout(() => {
-                loadInventoryData();
+                loadProductosDetallados(); // <-- CAMBIADO: Nueva función
                 loadComponentTypes();
                 animateDashboardLogo();
             }, 600);
@@ -450,48 +452,48 @@ function showLoginError(message) {
 }
 
 // ====================================================================
-// GESTIÓN DE INVENTARIO
+// GESTIÓN DE INVENTARIO - NUEVA VERSIÓN MEJORADA
 // ====================================================================
-async function loadInventoryData(filter = "") {
+async function loadProductosDetallados(filter = "") {
     try {
-        console.log(`📊 Cargando inventario (filtro: "${filter}")`);
+        console.log(`📊 Cargando productos detallados (filtro: "${filter}")`);
         
         if (inventoryTableBody) {
             inventoryTableBody.innerHTML = `
                 <tr>
-                    <td colspan="8" style="text-align: center; padding: 40px;">
+                    <td colspan="6" style="text-align: center; padding: 40px;">
                         <div class="loading"></div> Cargando inventario...
                     </td>
                 </tr>
             `;
         }
 
-        const [inventoryResponse, statsResponse] = await Promise.all([
-            secureFetch(`${INVENTARIO_URL}/stock`),
+        const [productosResponse, statsResponse] = await Promise.all([
+            secureFetch(`${INVENTARIO_URL}/productos/detallado`),
             secureFetch(`${INVENTARIO_URL}/estadisticas`)
         ]);
 
-        if (!inventoryResponse.ok) {
-            throw new Error(`Error HTTP: ${inventoryResponse.status}`);
+        if (!productosResponse.ok) {
+            throw new Error(`Error HTTP: ${productosResponse.status}`);
         }
 
-        let data = await inventoryResponse.json();
-        inventoryCache = data;
-        renderInventoryTable(data, filter);
+        let productos = await productosResponse.json();
+        inventoryCache = productos;
+        renderProductosTabla(productos, filter);
 
         if (statsResponse.ok) {
             const stats = await statsResponse.json();
             updateStatistics(
-                stats.total_modelos || data.length,
+                stats.total_modelos || productos.length,
                 stats.modelos_stock_bajo || 0,
                 stats.total_seriales || 0
             );
         } else {
-            updateStatisticsFromData(data);
+            updateStatisticsFromData(productos);
         }
 
     } catch (error) {
-        console.error("❌ Error al cargar inventario:", error);
+        console.error("❌ Error al cargar productos detallados:", error);
         if (error.message === "Sesión expirada") {
             showLoginError("Sesión expirada");
         } else {
@@ -500,38 +502,41 @@ async function loadInventoryData(filter = "") {
     }
 }
 
-function updateStatisticsFromData(data) {
+function updateStatisticsFromData(productos) {
     let totalSeriales = 0;
     let lowStockCount = 0;
 
-    data.forEach(item => {
-        totalSeriales += item.stock_disponible;
-        if (item.stock_disponible <= 3) lowStockCount++;
+    productos.forEach(producto => {
+        totalSeriales += producto.total || 0;
+        if ((producto.almacen || 0) <= 3) lowStockCount++;
     });
 
-    updateStatistics(data.length, lowStockCount, totalSeriales);
+    updateStatistics(productos.length, lowStockCount, totalSeriales);
 }
 
-function renderInventoryTable(data, filter = "") {
+function renderProductosTabla(productos, filter = "") {
     if (!inventoryTableBody) return;
     
     if (filter) {
         const lowerFilter = filter.toLowerCase();
-        data = data.filter(item =>
-            item.producto.toLowerCase().includes(lowerFilter) || 
-            item.codigo_sku.toLowerCase().includes(lowerFilter) ||
-            item.tipo_pieza.toLowerCase().includes(lowerFilter)
+        productos = productos.filter(p =>
+            (p.marca && p.marca.toLowerCase().includes(lowerFilter)) ||
+            (p.modelo && p.modelo.toLowerCase().includes(lowerFilter)) ||
+            (p.nombre && p.nombre.toLowerCase().includes(lowerFilter)) ||
+            (p.codigo_sku && p.codigo_sku.toLowerCase().includes(lowerFilter)) ||
+            (p.categoria && p.categoria.toLowerCase().includes(lowerFilter))
         );
     }
 
     inventoryTableBody.innerHTML = "";
+    let totalProductos = 0;
     let totalSeriales = 0;
     let lowStockCount = 0;
 
-    if (data.length === 0) {
+    if (productos.length === 0) {
         inventoryTableBody.innerHTML = `
             <tr>
-                <td colspan="8" style="text-align: center; padding: 40px;">
+                <td colspan="6" style="text-align: center; padding: 40px;">
                     <i class="fas fa-search" style="font-size: 24px; margin-bottom: 10px; display: block; color: var(--color-text-secondary);"></i>
                     No se encontraron productos que coincidan con la búsqueda.
                 </td>
@@ -541,35 +546,101 @@ function renderInventoryTable(data, filter = "") {
         return;
     }
 
-    data.forEach((item, index) => {
+    productos.forEach((producto, index) => {
         const row = document.createElement("tr");
-        const stockStatus = item.stock_disponible <= 3 ? "Bajo" : item.stock_disponible === 0 ? "Agotado" : "Normal";
-        const statusClass = item.stock_disponible <= 3 ? "danger" : item.stock_disponible === 0 ? "warning" : "success";
+        const almacen = producto.almacen || 0;
+        const total = producto.total || 0;
         
-        const historialDesc = item.ultima_actividad_desc || "Sin actividad reciente";
-
-        totalSeriales += item.stock_disponible;
-        if (item.stock_disponible <= 3) lowStockCount++;
+        // Determinar nivel de stock
+        let stockClass = "stock-normal";
+        let stockIcon = "✓";
+        
+        if (almacen === 0) {
+            stockClass = "stock-agotado";
+            stockIcon = "✗";
+        } else if (almacen <= 3) {
+            stockClass = "stock-bajo";
+            stockIcon = "!";
+        } else if (almacen <= 10) {
+            stockClass = "stock-medio";
+            stockIcon = "~";
+        }
+        
+        totalProductos++;
+        totalSeriales += total;
+        if (almacen <= 3) lowStockCount++;
 
         row.innerHTML = `
-            <td>${item.producto_id}</td>
-            <td><strong>${item.producto}</strong></td>
-            <td>${item.tipo_pieza}</td>
-            <td><code>${item.codigo_sku}</code></td>
-            <td class="stock-cell">
-                <button class="btn-stock" data-id="${item.producto_id}" data-name="${item.producto}">
-                    <span class="stock-badge">${item.stock_disponible}</span>
-                    <i class="fas fa-box-open"></i> Ver Seriales
-                </button>
-            </td>
-            <td><span class="badge badge-${statusClass}">${stockStatus}</span></td>
             <td>
-                <span class="historial-text">${historialDesc}</span>
+                <strong>${producto.marca || 'Sin marca'}</strong>
             </td>
             <td>
-                <button class="btn-action btn-danger" onclick="eliminarProducto(${item.producto_id}, '${item.producto.replace(/'/g, "\\'")}')" title="Eliminar producto">
-                    <i class="fas fa-trash"></i>
-                </button>
+                <div class="producto-info">
+                    <div class="producto-modelo">${producto.modelo || producto.nombre}</div>
+                    ${producto.categoria ? `<div class="producto-categoria">${producto.categoria}</div>` : ''}
+                </div>
+            </td>
+            <td>
+                <div class="sku-display">
+                    <code>${producto.codigo_sku}</code>
+                </div>
+            </td>
+            <td>
+                <div class="stock-display ${stockClass}" 
+                     onclick="mostrarSerialesDetalle(${producto.producto_id}, '${(producto.modelo || producto.nombre).replace(/'/g, "\\'")}')">
+                    <span class="stock-icon">${stockIcon}</span>
+                    <span class="stock-number">${total}</span>
+                    <span class="stock-label">unidades</span>
+                    <i class="fas fa-eye stock-eye"></i>
+                </div>
+                <div class="stock-detalle">
+                    <small>${almacen} en almacén</small>
+                </div>
+            </td>
+            <td>
+                <div class="distribucion-estados">
+                    ${producto.almacen > 0 ? `
+                        <span class="estado-badge estado-almacen" title="En almacén">
+                            <i class="fas fa-warehouse"></i> ${producto.almacen}
+                        </span>
+                    ` : ''}
+                    ${producto.instalado > 0 ? `
+                        <span class="estado-badge estado-instalado" title="Instalados">
+                            <i class="fas fa-wrench"></i> ${producto.instalado}
+                        </span>
+                    ` : ''}
+                    ${producto.danado > 0 ? `
+                        <span class="estado-badge estado-danado" title="Dañados">
+                            <i class="fas fa-times-circle"></i> ${producto.danado}
+                        </span>
+                    ` : ''}
+                    ${producto.retirado > 0 ? `
+                        <span class="estado-badge estado-retirado" title="Retirados">
+                            <i class="fas fa-truck"></i> ${producto.retirado}
+                        </span>
+                    ` : ''}
+                </div>
+            </td>
+            <td>
+                <div class="acciones-rapidas">
+                    <button class="btn-accion btn-agregar" 
+                            onclick="agregarStockMultiple(${producto.producto_id}, '${(producto.modelo || producto.nombre).replace(/'/g, "\\'")}')"
+                            title="Agregar más unidades">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                    <button class="btn-accion btn-editar"
+                            onclick="editarProducto(${producto.producto_id})"
+                            title="Editar producto">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    ${currentUser?.role === 'admin' ? `
+                    <button class="btn-accion btn-eliminar"
+                            onclick="eliminarProducto(${producto.producto_id}, '${(producto.modelo || producto.nombre).replace(/'/g, "\\'")}')"
+                            title="Eliminar producto">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                    ` : ''}
+                </div>
             </td>
         `;
 
@@ -587,8 +658,7 @@ function renderInventoryTable(data, filter = "") {
         }
     });
 
-    updateStatistics(data.length, lowStockCount, totalSeriales);
-    attachStockButtonEvents();
+    updateStatistics(totalProductos, lowStockCount, totalSeriales);
 }
 
 function showInventoryError() {
@@ -596,7 +666,7 @@ function showInventoryError() {
     
     inventoryTableBody.innerHTML = `
         <tr>
-            <td colspan="8" style="text-align: center; color: var(--color-danger); padding: 40px;">
+            <td colspan="6" style="text-align: center; color: var(--color-danger); padding: 40px;">
                 <i class="fas fa-exclamation-triangle" style="font-size: 24px; margin-bottom: 10px; display: block;"></i>
                 Error al conectar con el servidor. Verifica tu conexión.
             </td>
@@ -604,18 +674,200 @@ function showInventoryError() {
     `;
 }
 
-function attachStockButtonEvents() {
-    document.querySelectorAll(".btn-stock").forEach((btn) => {
-        btn.addEventListener("click", function () {
-            const id = Number.parseInt(this.getAttribute("data-id"));
-            const name = this.getAttribute("data-name");
-            showSerialsDetail(id, name);
+// ====================================================================
+// FUNCIONALIDADES NUEVAS
+// ====================================================================
+
+// 1. AGREGAR STOCK MULTIPLE
+function agregarStockMultiple(productoId, productoNombre) {
+    // Crear modal dinámico
+    const modalHTML = `
+        <div class="modal" id="addStockModal" style="display: flex;">
+            <div class="modal-content" style="max-width: 500px;">
+                <div class="modal-header">
+                    <h2><i class="fas fa-layer-group"></i> Agregar Stock</h2>
+                    <button class="close-btn" onclick="cerrarModal('addStockModal')">&times;</button>
+                </div>
+                <div style="padding: 25px;">
+                    <div class="alert alert-info" style="margin-bottom: 20px;">
+                        <i class="fas fa-info-circle"></i> 
+                        Agregar múltiples unidades de: <strong>${productoNombre}</strong>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="cantidadUnidades">
+                            <i class="fas fa-boxes"></i> Cantidad de unidades
+                        </label>
+                        <input type="number" id="cantidadUnidades" class="form-control" 
+                               min="1" max="100" value="1" required>
+                        <small style="color: var(--color-text-secondary); font-size: 12px; margin-top: 5px;">
+                            Número de unidades físicas a agregar (máx. 100)
+                        </small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="estadoInicial">
+                            <i class="fas fa-info-circle"></i> Estado inicial
+                        </label>
+                        <select id="estadoInicial" class="form-control">
+                            <option value="ALMACEN">🟢 Almacén (Disponible)</option>
+                            <option value="INSTALADO">🔵 Instalado (En uso)</option>
+                            <option value="DAÑADO">🔴 Dañado (No usable)</option>
+                            <option value="RETIRADO">🟡 Retirado (Fuera de servicio)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="prefijoSerial">
+                            <i class="fas fa-tag"></i> Prefijo opcional para seriales
+                        </label>
+                        <input type="text" id="prefijoSerial" class="form-control" 
+                               placeholder="Ej: LOTE1, COMPRA2024, INVENTARIO...">
+                        <small style="color: var(--color-text-secondary); font-size: 12px; margin-top: 5px;">
+                            Opcional: añade un prefijo a los seriales generados
+                        </small>
+                    </div>
+                    
+                    <div style="display: flex; gap: 10px; margin-top: 25px;">
+                        <button type="button" class="btn btn-success" style="flex: 1;" onclick="procesarAgregarStock(${productoId})">
+                            <i class="fas fa-plus-circle"></i> Agregar Stock
+                        </button>
+                        <button type="button" class="btn btn-danger" onclick="cerrarModal('addStockModal')">
+                            <i class="fas fa-times"></i> Cancelar
+                        </button>
+                    </div>
+                    
+                    <div id="addStockMessage" class="alert" style="display: none; margin-top: 20px;"></div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Agregar modal al DOM
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
+    // Animación
+    if (typeof anime !== 'undefined') {
+        const modal = document.getElementById('addStockModal');
+        anime({
+            targets: modal.querySelector('.modal-content'),
+            opacity: [0, 1],
+            scale: [0.9, 1],
+            duration: 400,
+            easing: 'easeOutBack'
         });
-    });
+    }
+}
+
+async function procesarAgregarStock(productoId) {
+    const cantidad = document.getElementById('cantidadUnidades').value;
+    const estado = document.getElementById('estadoInicial').value;
+    const prefijo = document.getElementById('prefijoSerial').value.trim();
+    const messageDiv = document.getElementById('addStockMessage');
+    
+    if (!cantidad || cantidad < 1) {
+        showMessage(messageDiv, "❌ Ingresa una cantidad válida", "danger");
+        return;
+    }
+    
+    try {
+        const response = await secureFetch(`${INVENTARIO_URL}/agregar_lote`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                producto_id: productoId,
+                cantidad: parseInt(cantidad),
+                estado: estado,
+                prefijo: prefijo || null
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            showMessage(messageDiv, `✅ ${result.mensaje}`, "success");
+            
+            // Actualizar tabla después de 1.5 segundos
+            setTimeout(() => {
+                loadProductosDetallados();
+                cerrarModal('addStockModal');
+            }, 1500);
+        } else {
+            showMessage(messageDiv, `❌ ${result.error}`, "danger");
+        }
+    } catch (error) {
+        console.error("Error agregando stock:", error);
+        showMessage(messageDiv, "❌ Error de conexión con el servidor", "danger");
+    }
+}
+
+// 2. VER SERIALES DETALLADOS
+async function mostrarSerialesDetalle(productoId, productoNombre) {
+    currentProductId = productoId;
+    
+    // Actualizar título del modal existente
+    if (serialsModalTitle) {
+        serialsModalTitle.innerHTML = `<i class="fas fa-boxes"></i> Seriales: ${productoNombre}`;
+    }
+    
+    // Mostrar modal existente
+    if (serialsDetailModal) {
+        serialsDetailModal.style.display = "flex";
+        
+        if (typeof anime !== 'undefined') {
+            anime({
+                targets: serialsDetailModal.querySelector('.modal-content'),
+                opacity: [0, 1],
+                scale: [0.9, 1],
+                duration: 400,
+                easing: 'easeOutBack'
+            });
+        }
+    }
+    
+    // Cargar seriales
+    try {
+        const response = await secureFetch(`${INVENTARIO_URL}/seriales/${productoId}`);
+        if (!response.ok) throw new Error(`Error HTTP: ${response.status}`);
+
+        const seriales = await response.json();
+        renderSerialsTable(seriales, productoNombre);
+    } catch (error) {
+        console.error("❌ Error al cargar seriales:", error);
+        if (serialsTableBody) {
+            serialsTableBody.innerHTML = `
+                <tr>
+                    <td colspan="5" style="text-align: center; color: var(--color-danger); padding: 20px;">
+                        <i class="fas fa-exclamation-triangle"></i> Error al obtener seriales
+                    </td>
+                </tr>
+            `;
+        }
+    }
+}
+
+function cerrarModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (!modal) return;
+    
+    if (typeof anime !== 'undefined') {
+        anime({
+            targets: modal.querySelector('.modal-content'),
+            opacity: [1, 0],
+            scale: [1, 0.9],
+            duration: 300,
+            easing: 'easeInQuad',
+            complete: function() {
+                modal.remove();
+            }
+        });
+    } else {
+        modal.remove();
+    }
 }
 
 // ====================================================================
-// GESTIÓN DE SERIALES
+// GESTIÓN DE SERIALES (existente, mantener)
 // ====================================================================
 async function loadComponentTypes() {
     try {
@@ -730,55 +982,6 @@ function filterProductModels() {
     serialProductSelect.disabled = false;
 }
 
-async function showSerialsDetail(productoId, productoNombre) {
-    currentProductId = productoId;
-    
-    if (serialsModalTitle) {
-        serialsModalTitle.innerHTML = `<i class="fas fa-boxes"></i> Gestión de Seriales: ${productoNombre}`;
-    }
-    
-    if (serialsTableBody) {
-        serialsTableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px;"><div class="loading"></div> Cargando seriales...</td></tr>';
-    }
-    
-    if (serialsDetailModal) {
-        serialsDetailModal.style.display = "flex";
-    }
-    
-    selectedSerials.clear();
-    updateActionButtons();
-
-    if (typeof anime !== 'undefined') {
-        anime({
-            targets: serialsDetailModal,
-            opacity: [0, 1],
-            scale: [0.9, 1],
-            duration: 400,
-            easing: 'easeOutBack'
-        });
-    }
-
-    try {
-        const response = await secureFetch(`${INVENTARIO_URL}/seriales/${productoId}`);
-        if (!response.ok) throw new Error(`Error HTTP: ${response.status}`);
-
-        const serials = await response.json();
-        renderSerialsTable(serials, productoNombre);
-
-    } catch (error) {
-        console.error("❌ Error al cargar seriales:", error);
-        if (serialsTableBody) {
-            serialsTableBody.innerHTML = `
-                <tr>
-                    <td colspan="5" style="text-align: center; color: var(--color-danger); padding: 20px;">
-                        <i class="fas fa-exclamation-triangle"></i> Error al obtener seriales
-                    </td>
-                </tr>
-            `;
-        }
-    }
-}
-
 function renderSerialsTable(serials, productoNombre) {
     if (!serialsTableBody) return;
     
@@ -796,16 +999,7 @@ function renderSerialsTable(serials, productoNombre) {
         return;
     }
 
-    const contadores = {
-        ALMACEN: 0,
-        INSTALADO: 0,
-        DAÑADO: 0,
-        RETIRADO: 0
-    };
-
     serials.forEach((s, index) => {
-        contadores[s.estado]++;
-        
         const row = document.createElement("tr");
         row.className = `serial-row ${s.estado.toLowerCase()}`;
         
@@ -850,172 +1044,11 @@ function renderSerialsTable(serials, productoNombre) {
         }
     });
 
-    if (serialsModalTitle) {
-        serialsModalTitle.innerHTML = `
-            <i class="fas fa-boxes"></i> ${productoNombre}
-            <small style="display: block; font-size: 14px; color: var(--color-text-secondary); margin-top: 5px;">
-                🟢 ${contadores.ALMACEN} Almacén | 🔵 ${contadores.INSTALADO} Instalado | 🔴 ${contadores.DAÑADO} Dañado | 🟡 ${contadores.RETIRADO} Retirado
-            </small>
-        `;
-    }
-
     attachSerialActionEvents();
 }
 
-function attachSerialActionEvents() {
-    document.querySelectorAll(".change-status").forEach((btn) => {
-        btn.addEventListener("click", function () {
-            const serialId = this.getAttribute("data-serial-id");
-            const currentStatus = this.getAttribute("data-current-status");
-            showChangeStatusModal(serialId, currentStatus);
-        });
-    });
-
-    if (currentUser?.role === 'admin') {
-        document.querySelectorAll(".delete-serial").forEach((btn) => {
-            btn.addEventListener("click", function () {
-                const serialId = this.getAttribute("data-serial-id");
-                const serialCode = this.getAttribute("data-serial-code");
-                confirmDeleteSerial(serialId, serialCode);
-            });
-        });
-    }
-}
-
-function showChangeStatusModal(serialId, currentStatus) {
-    currentSerialId = serialId;
-    
-    if (newStatusSelect) newStatusSelect.value = "";
-    if (statusNotes) statusNotes.value = "";
-    if (statusMessage) statusMessage.style.display = "none";
-    
-    if (changeStatusModal) {
-        changeStatusModal.style.display = "flex";
-    }
-    
-    if (typeof anime !== 'undefined') {
-        anime({
-            targets: changeStatusModal,
-            opacity: [0, 1],
-            scale: [0.8, 1],
-            duration: 400,
-            easing: 'easeOutBack'
-        });
-    }
-}
-
-if (confirmStatusChange) {
-    confirmStatusChange.addEventListener("click", async () => {
-        if (!newStatusSelect || !statusMessage) return;
-        
-        const nuevoEstado = newStatusSelect.value;
-        const notas = statusNotes ? statusNotes.value.trim() : "";
-
-        if (!nuevoEstado) {
-            showMessage(statusMessage, "❌ Por favor selecciona un estado", "danger");
-            return;
-        }
-
-        try {
-            const response = await secureFetch(`${INVENTARIO_URL}/serial/${currentSerialId}`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    estado: nuevoEstado,
-                    notas: notas
-                })
-            });
-
-            const result = await response.json();
-
-            if (response.ok) {
-                showMessage(statusMessage, `✅ ${result.mensaje}`, "success");
-                
-                if (typeof anime !== 'undefined') {
-                    anime({
-                        targets: statusMessage,
-                        scale: [0.8, 1],
-                        duration: 300,
-                        easing: 'easeOutBack'
-                    });
-                }
-                
-                setTimeout(() => {
-                    if (changeStatusModal) changeStatusModal.style.display = "none";
-                    if (serialsModalTitle) {
-                        showSerialsDetail(currentProductId, serialsModalTitle.textContent.split(': ')[1]);
-                    }
-                }, 1500);
-            } else {
-                showMessage(statusMessage, `❌ ${result.error}`, "danger");
-            }
-        } catch (error) {
-            console.error("Error al cambiar estado:", error);
-            showMessage(statusMessage, "❌ Error de conexión con el servidor", "danger");
-        }
-    });
-}
-
-if (cancelStatusChange) {
-    cancelStatusChange.addEventListener("click", () => {
-        if (!changeStatusModal) return;
-        
-        if (typeof anime !== 'undefined') {
-            anime({
-                targets: changeStatusModal,
-                opacity: [1, 0],
-                scale: [1, 0.8],
-                duration: 300,
-                easing: 'easeInQuad',
-                complete: function() {
-                    changeStatusModal.style.display = "none";
-                }
-            });
-        } else {
-            changeStatusModal.style.display = "none";
-        }
-    });
-}
-
-function confirmDeleteSerial(serialId, serialCode) {
-    if (confirm(`¿Estás seguro de que quieres eliminar permanentemente el serial:\n\n"${serialCode}"?\n\nEsta acción no se puede deshacer.`)) {
-        deleteSerial(serialId);
-    }
-}
-
-async function deleteSerial(serialId) {
-    try {
-        const response = await secureFetch(`${INVENTARIO_URL}/serial/${serialId}`, {
-            method: "DELETE"
-        });
-
-        const result = await response.json();
-
-        if (response.ok) {
-            alert(`✅ ${result.mensaje}`);
-            if (serialsModalTitle) {
-                showSerialsDetail(currentProductId, serialsModalTitle.textContent.split(': ')[1]);
-            }
-        } else {
-            alert(`❌ ${result.error}`);
-        }
-    } catch (error) {
-        console.error("Error al eliminar serial:", error);
-        alert("❌ Error de conexión con el servidor");
-    }
-}
-
-function updateActionButtons() {
-    if (!btnMarcarInstalados || !btnMarcarDanados || !btnMarcarRetirados) return;
-    
-    const hasSelection = selectedSerials.size > 0;
-    btnMarcarInstalados.style.display = hasSelection ? 'inline-block' : 'none';
-    btnMarcarDanados.style.display = hasSelection ? 'inline-block' : 'none';
-    btnMarcarRetirados.style.display = hasSelection ? 'inline-block' : 'none';
-}
-
 // ====================================================================
-// REGISTRO DE SERIALES
+// REGISTRO DE SERIALES (existente, mantener)
 // ====================================================================
 if (serialForm) {
     serialForm.addEventListener("submit", async (e) => {
@@ -1055,7 +1088,7 @@ if (serialForm) {
                 showMessage(serialMessage, `✅ ${result.mensaje}`, "success");
                 serialForm.reset();
                 inventoryCache = null;
-                loadInventoryData();
+                loadProductosDetallados();
                 
                 if (typeof anime !== 'undefined') {
                     anime({
@@ -1081,7 +1114,7 @@ if (serialForm) {
 }
 
 // ====================================================================
-// GESTIÓN DE PRODUCTOS
+// GESTIÓN DE PRODUCTOS (existente, mantener)
 // ====================================================================
 if (addProductBtn) {
     addProductBtn.addEventListener("click", () => {
@@ -1165,22 +1198,6 @@ function populateProductTypes(types) {
     console.log(`✅ Select poblado con ${types.length} categorías`);
 }
 
-function sugerirSKU(nombre) {
-    if (!nombre) return '';
-    
-    const palabras = nombre.split(' ').filter(palabra => palabra.length > 0);
-    let skuSugerido = '';
-    
-    for (let i = 0; i < Math.min(palabras.length, 3); i++) {
-        skuSugerido += palabras[i].substring(0, 3).toUpperCase();
-        if (i < Math.min(palabras.length, 3) - 1) {
-            skuSugerido += '-';
-        }
-    }
-    
-    return skuSugerido;
-}
-
 if (productForm) {
     productForm.addEventListener("submit", async (e) => {
         e.preventDefault();
@@ -1221,7 +1238,7 @@ if (productForm) {
                 inventoryCache = null;
                 
                 await fetchAllProductModels();
-                loadInventoryData();
+                loadProductosDetallados();
                 loadComponentTypes();
                 
                 if (typeof anime !== 'undefined') {
@@ -1248,10 +1265,10 @@ if (productForm) {
 }
 
 // ====================================================================
-// ELIMINAR PRODUCTO
+// ELIMINAR PRODUCTO (existente, mantener)
 // ====================================================================
 async function eliminarProducto(productoId, productoNombre) {
-    if (!confirm(`¿Eliminar el producto "${productoNombre}"?\n\nEsta acción no se puede deshacer.`)) {
+    if (!confirm(`¿Eliminar el producto "${productoNombre}"?\n\nEsta acción eliminará TODOS sus seriales y no se puede deshacer.`)) {
         return;
     }
 
@@ -1264,7 +1281,7 @@ async function eliminarProducto(productoId, productoNombre) {
 
         if (response.ok) {
             alert(`✅ ${result.mensaje}`);
-            loadInventoryData();
+            loadProductosDetallados();
         } else {
             alert(`❌ ${result.error}`);
         }
@@ -1350,6 +1367,22 @@ if (productNameInput && productSKUInput) {
     });
 }
 
+function sugerirSKU(nombre) {
+    if (!nombre) return '';
+    
+    const palabras = nombre.split(' ').filter(palabra => palabra.length > 0);
+    let skuSugerido = '';
+    
+    for (let i = 0; i < Math.min(palabras.length, 3); i++) {
+        skuSugerido += palabras[i].substring(0, 3).toUpperCase();
+        if (i < Math.min(palabras.length, 3) - 1) {
+            skuSugerido += '-';
+        }
+    }
+    
+    return skuSugerido;
+}
+
 if (componentTypeSelect) {
     componentTypeSelect.addEventListener('change', filterProductModels);
 }
@@ -1385,35 +1418,11 @@ if (closeProductModal) {
     });
 }
 
-// Event listeners para modal de crear categoría
-if (addNewCategoryBtn) {
-    addNewCategoryBtn.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        console.log("🆕 Botón Nueva Categoría clickeado (1)");
-        if (categoryModal) {
-            categoryModal.style.display = "flex";
-        }
-        if (categoryForm) categoryForm.reset();
-        if (categoryMessage) categoryMessage.style.display = "none";
-        
-        if (typeof anime !== 'undefined') {
-            anime({
-                targets: categoryModal,
-                opacity: [0, 1],
-                scale: [0.9, 1],
-                duration: 400,
-                easing: 'easeOutBack'
-            });
-        }
-    });
-}
-
 if (newCategoryBtn) {
     newCategoryBtn.addEventListener("click", (e) => {
         e.preventDefault();
         e.stopPropagation();
-        console.log("🆕 Botón Nueva Categoría clickeado (2)");
+        console.log("🆕 Botón Nueva Categoría clickeado");
         if (categoryModal) {
             categoryModal.style.display = "flex";
         }
@@ -1461,20 +1470,20 @@ window.addEventListener("click", (e) => {
 
 if (searchBtn) {
     searchBtn.addEventListener("click", () => {
-        loadInventoryData(searchInput ? searchInput.value : "");
+        loadProductosDetallados(searchInput ? searchInput.value : "");
     });
 }
 
 if (searchInput) {
     searchInput.addEventListener("keyup", (e) => {
         if (e.key === "Enter") {
-            loadInventoryData(searchInput.value);
+            loadProductosDetallados(searchInput.value);
         }
     });
 
     searchInput.addEventListener("input", (e) => {
         if (e.target.value === "") {
-            loadInventoryData("");
+            loadProductosDetallados("");
         }
     });
 }
@@ -1571,7 +1580,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             userInitial.textContent = currentUser.name.charAt(0);
             userName.textContent = currentUser.name;
             
-            loadInventoryData();
+            loadProductosDetallados(); // <-- NUEVA FUNCIÓN
             loadComponentTypes();
             animateDashboardLogo();
             startSessionChecker();
@@ -1599,74 +1608,264 @@ document.addEventListener("DOMContentLoaded", async () => {
     console.log("✅ Sistema de inventario para Soluciones Lógicas inicializado correctamente");
 });
 
-// Agregar estilos CSS dinámicos para mejor visualización
+// ====================================================================
+// AGREGAR ESTILOS CSS DINÁMICOS
+// ====================================================================
 const dynamicStyles = `
 <style>
-.stock-badge {
-    background: var(--color-primary);
-    color: white;
-    border-radius: 12px;
-    padding: 2px 8px;
-    font-size: 12px;
-    font-weight: bold;
-    margin-right: 8px;
+/* ESTILOS PARA NUEVA TABLA */
+.producto-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
 }
 
-.btn-stock {
+.producto-modelo {
+    font-weight: 600;
+    color: var(--color-text);
+}
+
+.producto-categoria {
+    font-size: 11px;
+    color: var(--color-text-secondary);
+    background: rgba(255, 255, 255, 0.05);
+    padding: 2px 6px;
+    border-radius: 10px;
+    display: inline-block;
+}
+
+.sku-display {
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    background: rgba(255, 255, 255, 0.03);
+    padding: 4px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--color-border);
+}
+
+/* ESTILOS PARA STOCK */
+.stock-display {
     display: flex;
     align-items: center;
     gap: 8px;
-    transition: all 0.3s ease;
-}
-
-.btn-stock:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-}
-
-.serial-row.almacen { background: rgba(0, 255, 136, 0.05); }
-.serial-row.instalado { background: rgba(0, 102, 255, 0.05); }
-.serial-row.dañado { background: rgba(255, 68, 68, 0.05); }
-.serial-row.retirado { background: rgba(255, 170, 0, 0.05); }
-
-.action-buttons {
-    display: flex;
-    gap: 5px;
-}
-
-.btn-action {
-    padding: 6px 10px;
-    border: none;
+    padding: 10px 12px;
     border-radius: var(--border-radius-sm);
     cursor: pointer;
+    transition: var(--transition);
+    min-width: 140px;
+    position: relative;
+    border: 2px solid;
+}
+
+.stock-display:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-soft);
+}
+
+.stock-agotado {
+    background: rgba(255, 68, 68, 0.1);
+    border-color: rgba(255, 68, 68, 0.3);
+    color: var(--color-danger);
+}
+
+.stock-bajo {
+    background: rgba(255, 170, 0, 0.1);
+    border-color: rgba(255, 170, 0, 0.3);
+    color: var(--color-warning);
+}
+
+.stock-medio {
+    background: rgba(255, 255, 0, 0.1);
+    border-color: rgba(255, 255, 0, 0.3);
+    color: #ffcc00;
+}
+
+.stock-normal {
+    background: rgba(0, 255, 136, 0.1);
+    border-color: rgba(0, 255, 136, 0.3);
+    color: var(--color-success);
+}
+
+.stock-icon {
+    font-size: 16px;
+    font-weight: bold;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: currentColor;
+    color: white;
+}
+
+.stock-agotado .stock-icon { background: var(--color-danger); }
+.stock-bajo .stock-icon { background: var(--color-warning); }
+.stock-medio .stock-icon { background: #ffcc00; }
+.stock-normal .stock-icon { background: var(--color-success); }
+
+.stock-number {
+    font-size: 22px;
+    font-weight: 800;
+    min-width: 30px;
+    text-align: center;
+}
+
+.stock-label {
+    font-size: 11px;
+    opacity: 0.8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.stock-eye {
+    margin-left: auto;
+    opacity: 0.6;
+    transition: opacity 0.3s;
+}
+
+.stock-display:hover .stock-eye {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+.stock-detalle {
+    margin-top: 4px;
+    font-size: 11px;
+    color: var(--color-text-secondary);
+    text-align: center;
+}
+
+/* DISTRIBUCIÓN DE ESTADOS */
+.distribucion-estados {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-width: 200px;
+}
+
+.estado-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 12px;
     font-size: 12px;
+    font-weight: 600;
+    width: fit-content;
     transition: var(--transition);
 }
 
-.btn-action.change-status {
-    background: var(--color-primary);
-    color: white;
+.estado-badge:hover {
+    transform: translateX(3px);
 }
 
-.btn-action.delete-serial {
-    background: var(--color-danger);
-    color: white;
+.estado-almacen {
+    background: rgba(0, 255, 136, 0.15);
+    color: var(--color-success);
+    border: 1px solid rgba(0, 255, 136, 0.3);
 }
 
-.btn-action:hover {
-    transform: scale(1.1);
-    opacity: 0.9;
+.estado-instalado {
+    background: rgba(0, 102, 255, 0.15);
+    color: var(--color-primary);
+    border: 1px solid rgba(0, 102, 255, 0.3);
 }
 
-.historial-text {
-    color: var(--color-text-secondary);
-    font-size: 13px;
+.estado-danado {
+    background: rgba(255, 68, 68, 0.15);
+    color: var(--color-danger);
+    border: 1px solid rgba(255, 68, 68, 0.3);
 }
 
-.modal {
-    transition: opacity 0.3s ease;
+.estado-retirado {
+    background: rgba(255, 170, 0, 0.15);
+    color: var(--color-warning);
+    border: 1px solid rgba(255, 170, 0, 0.3);
 }
 
+/* ACCIONES RÁPIDAS */
+.acciones-rapidas {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+}
+
+.btn-accion {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--border-radius-sm);
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition);
+    font-size: 14px;
+}
+
+.btn-accion:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-soft);
+}
+
+.btn-agregar {
+    background: rgba(0, 255, 136, 0.1);
+    color: var(--color-success);
+    border: 1px solid rgba(0, 255, 136, 0.2);
+}
+
+.btn-agregar:hover {
+    background: rgba(0, 255, 136, 0.2);
+}
+
+.btn-editar {
+    background: rgba(0, 102, 255, 0.1);
+    color: var(--color-primary);
+    border: 1px solid rgba(0, 102, 255, 0.2);
+}
+
+.btn-editar:hover {
+    background: rgba(0, 102, 255, 0.2);
+}
+
+.btn-eliminar {
+    background: rgba(255, 68, 68, 0.1);
+    color: var(--color-danger);
+    border: 1px solid rgba(255, 68, 68, 0.2);
+}
+
+.btn-eliminar:hover {
+    background: rgba(255, 68, 68, 0.2);
+}
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+    .stock-display {
+        min-width: 120px;
+        padding: 8px;
+    }
+    
+    .stock-number {
+        font-size: 18px;
+    }
+    
+    .distribucion-estados {
+        max-width: 150px;
+    }
+    
+    .estado-badge {
+        font-size: 11px;
+        padding: 3px 8px;
+    }
+    
+    .btn-accion {
+        width: 32px;
+        height: 32px;
+    }
+}
+
+/* ESTILOS EXISTENTES MANTENIDOS */
 .loading {
     border: 3px solid #f3f3f3;
     border-top: 3px solid var(--color-primary);
@@ -1737,3 +1936,6 @@ document.head.insertAdjacentHTML('beforeend', dynamicStyles);
 
 // Exportar funciones globales para acceso desde HTML
 window.eliminarProducto = eliminarProducto;
+window.mostrarSerialesDetalle = mostrarSerialesDetalle;
+window.agregarStockMultiple = agregarStockMultiple;
+window.cerrarModal = cerrarModal;

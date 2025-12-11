@@ -1202,6 +1202,90 @@ def obtener_producto_por_id(producto_id):
         if conn:
             conn.close()
 # ====================================================================
+# API: ACTUALIZAR PRODUCTO EXISTENTE (NUEVO)
+# ====================================================================
+@app.route('/api/inventario/productos/<int:producto_id>', methods=['PUT', 'OPTIONS'])
+@protected_route
+def actualizar_producto(producto_id):
+    """Actualiza un producto existente"""
+    if request.method == 'OPTIONS':
+        return jsonify({}), 200
+    
+    conn = None
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({"error": "Datos JSON requeridos"}), 400
+        
+        # Validar campos requeridos
+        required = ['nombre', 'marca', 'modelo', 'tipo_pieza_id', 'codigo_sku']
+        for field in required:
+            if field not in data:
+                return jsonify({"error": f"Falta campo: {field}"}), 400
+        
+        nombre = data['nombre'].strip()
+        marca = data.get('marca', '').strip()
+        modelo = data.get('modelo', '').strip()
+        descripcion = data.get('descripcion', '').strip()
+        tipo_pieza_id = int(data['tipo_pieza_id'])
+        codigo_sku = data['codigo_sku'].strip()
+        
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({"error": "No se pudo conectar a la base de datos"}), 500
+            
+        cur = conn.cursor(cursor_factory=DictCursor)
+        
+        # Verificar que el producto existe
+        cur.execute('SELECT producto_id FROM productos WHERE producto_id = %s', (producto_id,))
+        if not cur.fetchone():
+            return jsonify({"error": "Producto no encontrado"}), 404
+        
+        # Verificar que el SKU no esté duplicado (excluyendo el producto actual)
+        cur.execute('''
+            SELECT producto_id FROM productos 
+            WHERE codigo_sku = %s AND producto_id != %s
+        ''', (codigo_sku, producto_id))
+        if cur.fetchone():
+            return jsonify({"error": f"El SKU '{codigo_sku}' ya está en uso por otro producto"}), 409
+        
+        # Actualizar producto
+        update_query = """
+        UPDATE productos 
+        SET nombre = %s,
+            marca = %s,
+            modelo = %s,
+            descripcion = %s,
+            tipo_pieza_id = %s,
+            codigo_sku = %s,
+            fecha_actualizacion = CURRENT_TIMESTAMP
+        WHERE producto_id = %s
+        RETURNING producto_id, nombre, marca, modelo, codigo_sku;
+        """
+        
+        cur.execute(update_query, (
+            nombre, marca, modelo, descripcion, 
+            tipo_pieza_id, codigo_sku, producto_id
+        ))
+        
+        result = dict(cur.fetchone())
+        
+        conn.commit()
+        cur.close()
+        
+        return jsonify({
+            "mensaje": f"Producto '{nombre}' actualizado correctamente",
+            "producto": result
+        })
+        
+    except Exception as e:
+        print(f"❌ Error actualizando producto: {e}")
+        return jsonify({"error": f"Error: {str(e)}"}), 500
+    finally:
+        if conn:
+            conn.close()
+# ====================================================================
 # API: OBTENER PRODUCTOS CON STOCK DETALLADO (NUEVO)
 # ====================================================================
 @app.route('/api/inventario/productos/detallado', methods=['GET', 'OPTIONS'])

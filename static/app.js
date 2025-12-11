@@ -41,6 +41,8 @@ const productTypeSelect = document.getElementById("productTypeSelect");
 const productNameInput = document.getElementById("productName");
 const productSKUInput = document.getElementById("productSKU");
 const productDescription = document.getElementById("productDescription");
+const productMarcaInput = document.getElementById("productMarca");
+const productModeloInput = document.getElementById("productModelo");
 
 // Elementos para crear nueva categoría
 const categoryModal = document.getElementById("categoryModal");
@@ -58,7 +60,7 @@ const searchInput = document.getElementById("searchInput");
 const searchBtn = document.getElementById("searchBtn");
 
 // NUEVOS ELEMENTOS PARA LA INTERFAZ MEJORADA
-const addMultipleBtn = document.getElementById("addMultipleBtn"); // <-- NUEVO BOTÓN
+const addMultipleBtn = document.getElementById("addMultipleBtn");
 
 // Elementos para gestión de seriales
 const serialsDetailModal = document.getElementById("serialsDetailModal");
@@ -307,7 +309,7 @@ async function secureLogin(username, password) {
             loginError.style.display = "none";
 
             setTimeout(() => {
-                loadProductosDetallados(); // <-- CAMBIADO: Nueva función
+                loadProductosDetallados();
                 loadComponentTypes();
                 animateDashboardLogo();
             }, 600);
@@ -1044,10 +1046,7 @@ function renderSerialsTable(serials, productoNombre) {
         }
     });
     
-    // ====================================================================
-    // ¡¡¡LÍNEA CRÍTICA AÑADIDA!!!
-    // ====================================================================
-    attachSerialActionEvents(); // <-- ¡ESTO ES LO QUE FALTABA!
+    attachSerialActionEvents();
 }
 
 // ====================================================================
@@ -1155,12 +1154,17 @@ async function confirmarCambioEstado(serialId) {
     const notas = document.getElementById('notasCambioEstado').value.trim();
     const messageDiv = document.getElementById('cambiarEstadoMessage');
     
+    if (!nuevoEstado) {
+        showMessage(messageDiv, "❌ Por favor selecciona un estado", "danger");
+        return;
+    }
+    
     try {
-        const response = await secureFetch(`${INVENTARIO_URL}/seriales/${serialId}/estado`, {
+        const response = await secureFetch(`${INVENTARIO_URL}/serial/${serialId}`, {
             method: 'PUT',
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ 
-                nuevo_estado: nuevoEstado,
+                estado: nuevoEstado,
                 notas: notas || `Cambio de estado realizado por ${currentUser?.name || 'usuario'}`
             })
         });
@@ -1197,7 +1201,7 @@ async function eliminarSerial(serialId, codigoSerial) {
     }
     
     try {
-        const response = await secureFetch(`${INVENTARIO_URL}/seriales/${serialId}`, {
+        const response = await secureFetch(`${INVENTARIO_URL}/serial/${serialId}`, {
             method: 'DELETE'
         });
         
@@ -1378,7 +1382,7 @@ if (productForm) {
         e.preventDefault();
         if (productMessage) productMessage.style.display = "none";
 
-        if (!productNameInput || !productTypeSelect || !productSKUInput) {
+        if (!productNameInput || !productTypeSelect || !productSKUInput || !productMarcaInput || !productModeloInput) {
             showMessage(productMessage, "❌ Error en formulario", "danger");
             return;
         }
@@ -1387,10 +1391,12 @@ if (productForm) {
             nombre: productNameInput.value.trim(),
             descripcion: productDescription ? productDescription.value.trim() : "",
             tipo_pieza_id: parseInt(productTypeSelect.value),
-            codigo_sku: productSKUInput.value.trim()
+            codigo_sku: productSKUInput.value.trim(),
+            marca: productMarcaInput.value.trim(),
+            modelo: productModeloInput.value.trim()
         };
 
-        if (!newProduct.nombre || !newProduct.tipo_pieza_id || !newProduct.codigo_sku) {
+        if (!newProduct.nombre || !newProduct.tipo_pieza_id || !newProduct.codigo_sku || !newProduct.marca || !newProduct.modelo) {
             showMessage(productMessage, "❌ Por favor completa todos los campos requeridos", "danger");
             return;
         }
@@ -1465,6 +1471,7 @@ async function eliminarProducto(productoId, productoNombre) {
         alert("❌ Error de conexión");
     }
 }
+
 // ====================================================================
 // EDITAR PRODUCTO (TEMPORAL)
 // ====================================================================
@@ -1573,7 +1580,7 @@ if (componentTypeSelect) {
 function closeModalWithAnimation(modal) {
     if (!modal) return;
     
-    if (typeof anime !== 'undefined') {
+    if (typeof anime === 'undefined') {
         anime({
             targets: modal,
             opacity: [1, 0],
@@ -1763,7 +1770,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             userInitial.textContent = currentUser.name.charAt(0);
             userName.textContent = currentUser.name;
             
-            loadProductosDetallados(); // <-- NUEVA FUNCIÓN
+            loadProductosDetallados();
             loadComponentTypes();
             animateDashboardLogo();
             startSessionChecker();
@@ -2167,5 +2174,5 @@ window.eliminarProducto = eliminarProducto;
 window.mostrarSerialesDetalle = mostrarSerialesDetalle;
 window.agregarStockMultiple = agregarStockMultiple;
 window.cerrarModal = cerrarModal;
-window.confirmarCambioEstado = confirmarCambioEstado; // <-- Nueva función exportada
+window.confirmarCambioEstado = confirmarCambioEstado;
 window.editarProducto = editarProducto;

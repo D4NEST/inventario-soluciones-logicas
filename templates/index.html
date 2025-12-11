@@ -103,7 +103,7 @@
             max-width: 420px;
         }
         
-        /* ESTILOS PARA NUEVA TABLA */
+        /* ESTILOS PARA NUEVA TABLA - CORREGIDOS */
         .marca-modelo-cell {
             display: flex;
             flex-direction: column;
@@ -120,7 +120,7 @@
             color: var(--color-text-secondary);
         }
         
-        .sku-cell {
+        .sku-display {
             font-family: 'Courier New', monospace;
             font-size: 13px;
             background: rgba(255, 255, 255, 0.03);
@@ -130,113 +130,153 @@
             display: inline-block;
         }
         
-        .stock-display-container {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-        
-        .stock-visual {
+        .stock-display {
             display: flex;
             align-items: center;
             gap: 8px;
+            padding: 10px 12px;
+            border-radius: var(--border-radius-sm);
             cursor: pointer;
             transition: var(--transition);
+            min-width: 140px;
+            position: relative;
+            border: 2px solid;
         }
-        
-        .stock-visual:hover {
+
+        .stock-display:hover {
             transform: translateY(-2px);
+            box-shadow: var(--shadow-soft);
         }
-        
-        .stock-indicator {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            display: inline-block;
+
+        .stock-agotado {
+            background: rgba(255, 68, 68, 0.1);
+            border-color: rgba(255, 68, 68, 0.3);
+            color: var(--color-danger);
         }
-        
-        .stock-indicator.bajo {
-            background: var(--color-danger);
-            box-shadow: 0 0 10px rgba(255, 68, 68, 0.5);
+
+        .stock-bajo {
+            background: rgba(255, 170, 0, 0.1);
+            border-color: rgba(255, 170, 0, 0.3);
+            color: var(--color-warning);
         }
-        
-        .stock-indicator.normal {
-            background: var(--color-success);
-            box-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+
+        .stock-medio {
+            background: rgba(255, 255, 0, 0.1);
+            border-color: rgba(255, 255, 0, 0.3);
+            color: #ffcc00;
         }
-        
-        .stock-indicator.alto {
-            background: var(--color-warning);
-            box-shadow: 0 0 10px rgba(255, 170, 0, 0.5);
+
+        .stock-normal {
+            background: rgba(0, 255, 136, 0.1);
+            border-color: rgba(0, 255, 136, 0.3);
+            color: var(--color-success);
         }
-        
-        .stock-number {
-            font-weight: 700;
+
+        .stock-icon {
             font-size: 16px;
-            min-width: 40px;
+            font-weight: bold;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            background: currentColor;
+            color: white;
         }
-        
-        .stock-view-btn {
-            background: none;
-            border: none;
-            color: var(--color-primary-light);
-            cursor: pointer;
-            padding: 4px;
-            border-radius: 4px;
-            transition: var(--transition);
+
+        .stock-agotado .stock-icon { background: var(--color-danger); }
+        .stock-bajo .stock-icon { background: var(--color-warning); }
+        .stock-medio .stock-icon { background: #ffcc00; }
+        .stock-normal .stock-icon { background: var(--color-success); }
+
+        .stock-number {
+            font-size: 22px;
+            font-weight: 800;
+            min-width: 30px;
+            text-align: center;
+        }
+
+        .stock-label {
+            font-size: 11px;
+            opacity: 0.8;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stock-eye {
             margin-left: auto;
+            opacity: 0.6;
+            transition: opacity 0.3s;
         }
-        
-        .stock-view-btn:hover {
-            background: rgba(0, 102, 255, 0.1);
+
+        .stock-display:hover .stock-eye {
+            opacity: 1;
             transform: scale(1.1);
         }
-        
-        .estado-badges {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 4px;
+
+        .stock-detalle {
             margin-top: 4px;
+            font-size: 11px;
+            color: var(--color-text-secondary);
+            text-align: center;
         }
-        
+
+        /* DISTRIBUCIÓN DE ESTADOS - IMPORTANTE: Esta columna faltaba */
+        .distribucion-estados {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-width: 200px;
+        }
+
         .estado-badge {
-            padding: 2px 6px;
-            border-radius: 10px;
-            font-size: 10px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
             font-weight: 600;
-            text-transform: uppercase;
+            width: fit-content;
+            transition: var(--transition);
         }
-        
-        .estado-badge.almacen {
+
+        .estado-badge:hover {
+            transform: translateX(3px);
+        }
+
+        .estado-almacen {
             background: rgba(0, 255, 136, 0.15);
             color: var(--color-success);
             border: 1px solid rgba(0, 255, 136, 0.3);
         }
-        
-        .estado-badge.instalado {
+
+        .estado-instalado {
             background: rgba(0, 102, 255, 0.15);
             color: var(--color-primary);
             border: 1px solid rgba(0, 102, 255, 0.3);
         }
-        
-        .estado-badge.danado {
+
+        .estado-danado {
             background: rgba(255, 68, 68, 0.15);
             color: var(--color-danger);
             border: 1px solid rgba(255, 68, 68, 0.3);
         }
-        
-        .estado-badge.retirado {
+
+        .estado-retirado {
             background: rgba(255, 170, 0, 0.15);
             color: var(--color-warning);
             border: 1px solid rgba(255, 170, 0, 0.3);
         }
-        
-        .acciones-cell {
+
+        /* ACCIONES RÁPIDAS */
+        .acciones-rapidas {
             display: flex;
             gap: 6px;
             justify-content: center;
         }
-        
+
         .btn-accion {
             width: 36px;
             height: 36px;
@@ -249,77 +289,82 @@
             transition: var(--transition);
             font-size: 14px;
         }
-        
+
         .btn-accion:hover {
             transform: translateY(-2px);
             box-shadow: var(--shadow-soft);
         }
-        
-        .btn-agregar-mas {
+
+        .btn-agregar {
             background: rgba(0, 255, 136, 0.1);
             color: var(--color-success);
             border: 1px solid rgba(0, 255, 136, 0.2);
         }
-        
-        .btn-agregar-mas:hover {
+
+        .btn-agregar:hover {
             background: rgba(0, 255, 136, 0.2);
         }
-        
+
         .btn-editar {
             background: rgba(0, 102, 255, 0.1);
             color: var(--color-primary);
             border: 1px solid rgba(0, 102, 255, 0.2);
         }
-        
+
         .btn-editar:hover {
             background: rgba(0, 102, 255, 0.2);
         }
-        
+
         .btn-eliminar {
             background: rgba(255, 68, 68, 0.1);
             color: var(--color-danger);
             border: 1px solid rgba(255, 68, 68, 0.2);
         }
-        
+
         .btn-eliminar:hover {
             background: rgba(255, 68, 68, 0.2);
         }
-        
-        /* Modal para agregar múltiples unidades */
-        .add-multiple-modal {
-            display: none;
-            position: fixed;
-            z-index: 2000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            backdrop-filter: blur(10px);
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-        }
-        
-        .add-multiple-modal.active {
-            display: flex;
-        }
-        
+
+        /* RESPONSIVE */
         @media (max-width: 768px) {
-            .acciones-cell {
-                flex-direction: column;
-                align-items: center;
+            .stock-display {
+                min-width: 120px;
+                padding: 8px;
+            }
+            
+            .stock-number {
+                font-size: 18px;
+            }
+            
+            .distribucion-estados {
+                max-width: 150px;
+            }
+            
+            .estado-badge {
+                font-size: 11px;
+                padding: 3px 8px;
             }
             
             .btn-accion {
                 width: 32px;
                 height: 32px;
-                font-size: 12px;
             }
-            
-            .stock-visual {
-                flex-wrap: wrap;
-            }
+        }
+
+        /* ESTILOS EXISTENTES MANTENIDOS */
+        .loading {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid var(--color-primary);
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
@@ -412,7 +457,7 @@
                         </div>
                     </div>
 
-                    <!-- NUEVA TABLA DE INVENTARIO CON COLUMNAS SOLICITADAS -->
+                    <!-- TABLA DE INVENTARIO CORREGIDA - 5 COLUMNAS -->
                     <div class="card">
                         <div class="search-bar">
                             <input type="text" id="searchInput" class="form-control" 
@@ -430,12 +475,14 @@
                                         <th><i class="fas fa-cube"></i> Modelo</th>
                                         <th><i class="fas fa-barcode"></i> Código Único (SKU)</th>
                                         <th><i class="fas fa-boxes"></i> Stock</th>
+                                        <!-- COLUMNA FALTANTE AÑADIDA -->
+                                        <th><i class="fas fa-chart-pie"></i> Distribución por Estado</th>
                                         <th><i class="fas fa-cogs"></i> Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody id="inventoryTableBody">
                                     <tr>
-                                        <td colspan="5" style="text-align: center; padding: 40px;">
+                                        <td colspan="6" style="text-align: center; padding: 40px;">
                                             <div class="loading"></div> Cargando inventario...
                                         </td>
                                     </tr>

@@ -1043,8 +1043,46 @@ function renderSerialsTable(serials, productoNombre) {
             });
         }
     });
+    // ====================================================================
+// EVENTOS PARA SERIALES - NUEVA FUNCIÓN
+// ====================================================================
+function attachSerialActionEvents() {
+    console.log("🔧 Attaching serial action events...");
+    
+    // Botones para cambiar estado de seriales
+    document.querySelectorAll('.change-status').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const serialId = this.dataset.serialId;
+            const estadoActual = this.dataset.currentStatus;
+            cambiarEstadoSerial(serialId, estadoActual);
+        });
+    });
+    
+    // Botones para eliminar seriales
+    document.querySelectorAll('.delete-serial').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const serialId = this.dataset.serialId;
+            const codigoSerial = this.dataset.serialCode;
+            eliminarSerial(serialId, codigoSerial);
+        });
+    });
+}
 
-    attachSerialActionEvents();
+function cambiarEstadoSerial(serialId, estadoActual) {
+    console.log(`🔄 Cambiando estado del serial ${serialId} desde ${estadoActual}`);
+    alert(`Funcionalidad en desarrollo: Cambiar estado del serial ${serialId}`);
+    // TODO: Implementar cambio de estado real
+}
+
+function eliminarSerial(serialId, codigoSerial) {
+    if (confirm(`¿Estás seguro de eliminar el serial ${codigoSerial}?`)) {
+        console.log(`🗑️ Eliminando serial ${serialId}`);
+        alert(`Funcionalidad en desarrollo: Eliminar serial ${codigoSerial}`);
+        // TODO: Implementar eliminación real
+    }
+}
+
+  
 }
 
 // ====================================================================

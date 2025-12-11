@@ -73,60 +73,46 @@ CORS(app,
      expose_headers=['Set-Cookie'])
 
 # ====================================================================
-# CONEXIÓN A BASE DE DATOS
+# CONEXIÓN A BASE DE DATOS - OPTIMIZADA
 # ====================================================================
 def get_db_connection():
-    """Establece la conexión con la base de datos - funciona en LOCAL y RENDER"""
+    """Establece conexión con PostgreSQL - Optimizada para Render y Local"""
     try:
-        # 1️⃣ PRIMERO: Intentar con DATABASE_URL de RENDER
+        # 1️⃣ Intentar con DATABASE_URL de RENDER
         DATABASE_URL = os.environ.get('DATABASE_URL')
         
         if DATABASE_URL:
-            # ✅ CONEXIÓN RENDER
             parsed_url = urlparse(DATABASE_URL)
-            DB_HOST = parsed_url.hostname
-            DB_PORT = parsed_url.port
-            DB_NAME = parsed_url.path[1:]  # Eliminar el '/' inicial
-            DB_USER = parsed_url.username
-            DB_PASS = parsed_url.password
+            conn_params = {
+                'host': parsed_url.hostname,
+                'database': parsed_url.path[1:],
+                'user': parsed_url.username,
+                'password': parsed_url.password,
+                'port': parsed_url.port,
+                'connect_timeout': 30,
+                'sslmode': 'require'
+            }
             
-            print(f"🔍 CONEXIÓN BD RENDER - Host: {DB_HOST}:{DB_PORT}, User: {DB_USER}, DB: {DB_NAME}")
-            
-            conn = psycopg2.connect(
-                host=DB_HOST,
-                database=DB_NAME,
-                user=DB_USER,
-                password=DB_PASS,
-                port=DB_PORT,
-                connect_timeout=30,
-                sslmode='require'
-            )
-            print("✅ CONEXIÓN A BD RENDER EXITOSA!")
+            conn = psycopg2.connect(**conn_params)
+            print("✅ Conexión RENDER exitosa")
             return conn
         else:
-            # 2️⃣ SEGUNDO: Conexión LOCAL con valores por defecto
-            DB_HOST = os.environ.get('DB_HOST', 'localhost')
-            DB_PORT = os.environ.get('DB_PORT', '5432')
-            DB_NAME = os.environ.get('DB_NAME', 'inventario_sistema')
-            DB_USER = os.environ.get('DB_USER', 'postgres')
-            DB_PASS = os.environ.get('DB_PASS', 'password')
+            # 2️⃣ Conexión LOCAL
+            conn_params = {
+                'host': os.environ.get('DB_HOST', 'localhost'),
+                'database': os.environ.get('DB_NAME', 'inventario_sistema'),
+                'user': os.environ.get('DB_USER', 'postgres'),
+                'password': os.environ.get('DB_PASS', 'password'),
+                'port': os.environ.get('DB_PORT', '5432'),
+                'connect_timeout': 30
+            }
             
-            print(f"🔧 CONEXIÓN LOCAL - Host: {DB_HOST}:{DB_PORT}, DB: {DB_NAME}, User: {DB_USER}")
-            
-            conn = psycopg2.connect(
-                host=DB_HOST,
-                database=DB_NAME,
-                user=DB_USER,
-                password=DB_PASS,
-                port=DB_PORT,
-                connect_timeout=30
-            )
-            print("✅ CONEXIÓN A BD LOCAL EXITOSA!")
+            conn = psycopg2.connect(**conn_params)
+            print("✅ Conexión LOCAL exitosa")
             return conn
             
     except Exception as e:
         print(f"❌ ERROR CONEXIÓN BD: {str(e)}")
-        print("💡 ¿Tienes PostgreSQL corriendo localmente?")
         return None
 
 # ====================================================================
@@ -134,67 +120,78 @@ def get_db_connection():
 # ====================================================================
 @app.before_request
 def verificar_entorno():
-    """Middleware para configurar entorno y debugging"""
-    # Solo loguear requests importantes
-    if request.endpoint not in ['health_check', 'send_static', 'static']:
+    """Middleware para logging y debugging"""
+    if request.endpoint not in ['health_check', 'static'] and FLASK_ENV != 'production':
         print(f"🔍 {request.method} {request.path}")
-        
-        # Debug detallado solo en desarrollo
-        if FLASK_ENV != 'production':
-            if request.cookies:
-                print(f"🍪 Cookies recibidas: {list(request.cookies.keys())}")
-            if 'user_id' in session:
-                print(f"👤 Usuario en sesión: {session.get('username')}")
 
 @app.after_request
 def after_request(response):
-    """Agregar headers de seguridad y CORS"""
-    
-    # Headers de seguridad COMUNES
+    """Headers de seguridad y CORS"""
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['X-Frame-Options'] = 'DENY'
     response.headers['X-XSS-Protection'] = '1; mode=block'
     
-    # Headers CORS ESPECÍFICOS
     origin = request.headers.get('Origin', '')
     allowed_origins = [
         'http://localhost:10000',
         'http://127.0.0.1:10000',
-        'http://192.168.1.112:10000',
         'https://inventario-soluciones-logicas.onrender.com'
     ]
     
     if origin in allowed_origins:
         response.headers['Access-Control-Allow-Origin'] = origin
         response.headers['Access-Control-Allow-Credentials'] = 'true'
-        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
-        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With'
-    
-    # Debug de cookies (solo desarrollo)
-    if FLASK_ENV != 'production' and 'Set-Cookie' in response.headers:
-        print(f"🍪 Cookie establecida: {response.headers['Set-Cookie'][:50]}...")
     
     return response
 
 # ====================================================================
-# HEALTH CHECK ENDPOINT
+# DECORATOR PARA RUTAS PROTEGIDAS
+# ====================================================================
+def require_auth():
+    """Verifica autenticación"""
+    if 'user_id' not in session:
+        return jsonify({"error": "No autorizado"}), 401
+    return None
+
+def protected_route(f):
+    """Decorator para rutas que requieren autenticación"""
+    def decorated_function(*args, **kwargs):
+        auth_error = require_auth()
+        if auth_error:
+            return auth_error
+        return f(*args, **kwargs)
+    decorated_function.__name__ = f.__name__
+    return decorated_function
+
+# ====================================================================
+# HEALTH CHECK
 # ====================================================================
 @app.route('/health')
 def health_check():
-    """Endpoint para health checks de Render"""
+    """Health check para Render"""
     return jsonify({
         "status": "healthy", 
         "timestamp": datetime.now().isoformat(),
-        "service": "inventario-soluciones-logicas",
         "environment": FLASK_ENV
     }), 200
+
+# ====================================================================
+# RUTAS PRINCIPALES
+# ====================================================================
+@app.route('/')
+def index():
+    return send_from_directory('templates', 'index.html')
+
+@app.route('/static/<path:path>')
+def send_static(path):
+    return send_from_directory('static', path)
 
 # ====================================================================
 # AUTENTICACIÓN MEJORADA
 # ====================================================================
 @app.route('/api/auth/login', methods=['POST', 'OPTIONS'])
 def login():
-    """Login mejorado con validación robusta"""
+    """Login seguro con validación robusta"""
     if request.method == 'OPTIONS':
         return jsonify({}), 200
     
@@ -208,13 +205,11 @@ def login():
         
         print(f"🔐 Intento de login: {username}")
         
-        # Validación básica
         if not username or not password:
             return jsonify({"error": "Usuario y contraseña requeridos"}), 400
         
-        # 🔐 VALIDACIÓN ROBUSTA MANTENIDA
+        # 🔐 VALIDACIÓN ROBUSTA
         if username == 'admin' and password == 'Admin123!':
-            # Configurar sesión SEGURA
             session.permanent = True
             session['user_id'] = 1
             session['username'] = 'admin'
@@ -224,27 +219,19 @@ def login():
             session['last_activity'] = datetime.now().isoformat()
             
             print(f"✅ Login exitoso para: {username}")
-            print(f"✅ Login exitoso para: {username}")
             
-            response = jsonify({
+            return jsonify({
                 "mensaje": "Login exitoso",
                 "user": {
                     "name": "Administrador",
                     "role": "admin",
                     "username": "admin"
-                },
-                "session_info": {
-                    "lifetime_hours": 8,
-                    "secure_cookie": app.config.get('SESSION_COOKIE_SECURE', False)
                 }
             })
             
-            return response
-            
         else:
-            # Delay para prevenir timing attacks
             import time
-            time.sleep(0.5)
+            time.sleep(0.5)  # Prevenir timing attacks
             print(f"❌ Credenciales inválidas para: {username}")
             return jsonify({"error": "Credenciales inválidas"}), 401
         
@@ -263,7 +250,6 @@ def logout():
     print(f"✅ Sesión cerrada para: {user}")
     
     response = jsonify({"mensaje": "Logout exitoso"})
-    # Limpiar cookie
     response.set_cookie(
         key=app.config['SESSION_COOKIE_NAME'],
         value='',
@@ -274,32 +260,13 @@ def logout():
 
 @app.route('/api/auth/check', methods=['GET', 'OPTIONS'])
 def check_auth():
-    """Verificar sesión con debugging detallado"""
+    """Verificar sesión activa"""
     if request.method == 'OPTIONS':
         return jsonify({}), 200
     
-    print(f"\n" + "="*50)
-    print(f"🔍 CHECK AUTH - Endpoint llamado")
-    print(f"📝 Método: {request.method}")
-    print(f"🌐 Origen: {request.headers.get('Origin')}")
-    print(f"🍪 Cookies presentes: {len(request.cookies)}")
-    
-    # Listar todas las cookies
-    for cookie_name, cookie_value in request.cookies.items():
-        print(f"   {cookie_name}: {cookie_value[:30]}...")
-    
-    # Verificar sesión Flask
-    session_exists = 'user_id' in session
-    print(f"🎫 Sesión Flask válida: {session_exists}")
-    
-    if session_exists:
-        # Renovar actividad
+    if 'user_id' in session:
         session['last_activity'] = datetime.now().isoformat()
         session.modified = True
-        
-        print(f"👤 Usuario: {session.get('username')}")
-        print(f"👥 Rol: {session.get('role')}")
-        print(f"⏰ Login: {session.get('login_time')}")
         
         return jsonify({
             "authenticated": True,
@@ -307,85 +274,70 @@ def check_auth():
                 "name": session.get('name'),
                 "role": session.get('role'),
                 "username": session.get('username')
-            },
-            "session": {
-                "active": True,
-                "login_time": session.get('login_time'),
-                "last_activity": session.get('last_activity')
             }
         }), 200
     else:
-        print(f"❌ NO AUTENTICADO")
+        return jsonify({"authenticated": False}), 200
+
+# ====================================================================
+# API: DIAGNÓSTICO DEL SISTEMA
+# ====================================================================
+@app.route('/api/debug/database', methods=['GET'])
+@protected_route
+def debug_database():
+    """Diagnóstico de estructura de base de datos"""
+    conn = None
+    try:
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({"error": "No se pudo conectar a la base de datos"}), 500
+            
+        cur = conn.cursor(cursor_factory=DictCursor)
+        
+        # 1. Ver estructura
+        cur.execute("""
+            SELECT table_name, column_name, data_type, is_nullable
+            FROM information_schema.columns 
+            WHERE table_schema = 'public'
+            ORDER BY table_name, ordinal_position;
+        """)
+        estructura = [dict(row) for row in cur.fetchall()]
+        
+        # 2. Ver datos existentes
+        cur.execute("""
+            SELECT 
+                p.codigo_sku,
+                p.nombre,
+                COUNT(s.serial_id) as unidades_existentes
+            FROM productos p 
+            LEFT JOIN seriales s ON p.producto_id = s.producto_id
+            GROUP BY p.codigo_sku, p.nombre
+            ORDER BY unidades_existentes DESC;
+        """)
+        datos_productos = [dict(row) for row in cur.fetchall()]
+        
+        cur.close()
         
         return jsonify({
-            "authenticated": False,
-            "debug": {
-                "cookies_received": list(request.cookies.keys()),
-                "session_keys": list(session.keys())
-            }
-        }), 200
+            "estructura": estructura,
+            "datos_productos": datos_productos,
+            "timestamp": datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        print(f"Error en debug_database: {e}")
+        return jsonify({"error": f"Error: {str(e)}"}), 500
+    finally:
+        if conn:
+            conn.close()
 
 # ====================================================================
-# MIDDLEWARE DE SEGURIDAD
-# ====================================================================
-def require_auth():
-    """Middleware para verificar autenticación"""
-    if 'user_id' not in session:
-        print("❌ Acceso no autorizado - Sesión inválida")
-        return jsonify({"error": "No autorizado"}), 401
-    return None
-
-def protected_route(f):
-    """Decorator para rutas protegidas"""
-    def decorated_function(*args, **kwargs):
-        auth_error = require_auth()
-        if auth_error:
-            return auth_error
-        return f(*args, **kwargs)
-    decorated_function.__name__ = f.__name__
-    return decorated_function
-
-# ====================================================================
-# RUTAS PRINCIPALES
-# ====================================================================
-@app.route('/')
-def index():
-    return send_from_directory('templates', 'index.html')
-
-@app.route('/static/<path:path>')
-def send_static(path):
-    return send_from_directory('static', path)
-
-# ====================================================================
-# DIAGNÓSTICO DEL SISTEMA
-# ====================================================================
-@app.route('/api/debug/session', methods=['GET'])
-def debug_session():
-    """Endpoint para diagnóstico de sesiones"""
-    info = {
-        "flask_env": FLASK_ENV,
-        "session_config": {
-            "cookie_name": app.config['SESSION_COOKIE_NAME'],
-            "cookie_secure": app.config['SESSION_COOKIE_SECURE'],
-            "cookie_httponly": app.config['SESSION_COOKIE_HTTPONLY'],
-            "cookie_samesite": app.config['SESSION_COOKIE_SAMESITE'],
-            "cookie_domain": app.config.get('SESSION_COOKIE_DOMAIN'),
-            "cookie_path": app.config['SESSION_COOKIE_PATH'],
-            "lifetime_hours": 8
-        },
-        "current_session": dict(session),
-        "request_cookies": dict(request.cookies),
-        "request_headers": {k: v for k, v in request.headers.items() 
-                           if k.lower() in ['origin', 'host', 'user-agent']}
-    }
-    return jsonify(info)
-
-# ====================================================================
-# API: OBTENER INVENTARIO DE STOCK
+# API: OBTENER INVENTARIO COMPLETO
 # ====================================================================
 @app.route('/api/inventario/stock', methods=['GET', 'OPTIONS'])
 @protected_route
 def obtener_inventario_stock():
+    """Obtiene inventario completo con estadísticas"""
     if request.method == 'OPTIONS':
         return jsonify({}), 200
     
@@ -400,46 +352,96 @@ def obtener_inventario_stock():
         query = """
         SELECT 
             p."producto_id",
-            p."nombre" AS producto,
-            tp."tipo_modelo" AS tipo_pieza, 
+            p."nombre",
+            COALESCE(p."marca", 'No especificada') AS marca,
+            COALESCE(p."modelo", 'No especificado') AS modelo,
+            tp."tipo_modelo" AS categoria,
             p."codigo_sku",
-            (
-                SELECT COUNT(*) 
-                FROM "seriales" s 
-                WHERE s."producto_id" = p."producto_id" AND s."estado" = 'ALMACEN'
-            ) AS stock_disponible,
-            (
-                SELECT 
-                    s_last."estado" || ' (' || TO_CHAR(s_last."fecha_registro", 'YYYY-MM-DD') || ')' 
-                FROM 
-                    "seriales" s_last
-                WHERE 
-                    s_last."producto_id" = p."producto_id"
-                ORDER BY 
-                    s_last."fecha_registro" DESC 
-                LIMIT 1
-            ) AS ultima_actividad_desc
+            p."descripcion",
+            -- Totales por estado
+            COUNT(s."serial_id") AS total_unidades,
+            SUM(CASE WHEN s."estado" = 'ALMACEN' THEN 1 ELSE 0 END) AS en_almacen,
+            SUM(CASE WHEN s."estado" = 'INSTALADO' THEN 1 ELSE 0 END) AS instalados,
+            SUM(CASE WHEN s."estado" = 'DAÑADO' THEN 1 ELSE 0 END) AS danados,
+            SUM(CASE WHEN s."estado" = 'RETIRADO' THEN 1 ELSE 0 END) AS retirados,
+            -- Estado de stock
+            CASE 
+                WHEN COUNT(s."serial_id") = 0 THEN 'SIN_STOCK'
+                WHEN SUM(CASE WHEN s."estado" = 'ALMACEN' THEN 1 ELSE 0 END) <= 3 THEN 'BAJO'
+                WHEN SUM(CASE WHEN s."estado" = 'ALMACEN' THEN 1 ELSE 0 END) <= 10 THEN 'MEDIO'
+                ELSE 'NORMAL'
+            END AS nivel_stock
         FROM 
             "productos" p
         JOIN 
             "tipos_pieza" tp ON p."tipo_pieza_id" = tp."tipo_id"
+        LEFT JOIN 
+            "seriales" s ON p."producto_id" = s."producto_id"
+        GROUP BY 
+            p."producto_id", p."nombre", p."marca", p."modelo", 
+            tp."tipo_modelo", p."codigo_sku", p."descripcion"
         ORDER BY 
-            p."nombre";
+            p."marca", p."modelo", p."nombre";
         """
         
         cur.execute(query)
-        inventario = cur.fetchall()
+        inventario = [dict(row) for row in cur.fetchall()]
         cur.close()
         
-        inventario_list = []
-        for row in inventario:
-            inventario_list.append(dict(row))
-            
-        return jsonify(inventario_list)
+        return jsonify(inventario)
     
     except Exception as e:
-        print(f"Error de DB en /stock: {e}")
-        return jsonify({"error": f"Error al obtener el inventario: {str(e)}"}), 500
+        print(f"Error en /stock: {e}")
+        return jsonify({"error": f"Error al obtener inventario: {str(e)}"}), 500
+    finally:
+        if conn:
+            conn.close()
+
+# ====================================================================
+# API: OBTENER ESTADÍSTICAS
+# ====================================================================
+@app.route('/api/inventario/estadisticas', methods=['GET', 'OPTIONS'])
+@protected_route
+def obtener_estadisticas():
+    """Obtiene estadísticas generales del inventario"""
+    if request.method == 'OPTIONS':
+        return jsonify({}), 200
+    
+    conn = None
+    try:
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({"error": "No se pudo conectar a la base de datos"}), 500
+            
+        cur = conn.cursor(cursor_factory=DictCursor)
+        
+        query = """
+        SELECT 
+            COUNT(DISTINCT p.producto_id) as total_modelos,
+            COUNT(DISTINCT s.serial_id) as total_seriales,
+            COUNT(DISTINCT CASE WHEN sub.stock_actual <= 3 THEN sub.producto_id END) as modelos_stock_bajo
+        FROM productos p
+        CROSS JOIN LATERAL (
+            SELECT 
+                p2.producto_id,
+                COUNT(s2.serial_id) as stock_actual
+            FROM productos p2
+            LEFT JOIN seriales s2 ON p2.producto_id = s2.producto_id AND s2.estado = 'ALMACEN'
+            WHERE p2.producto_id = p.producto_id
+            GROUP BY p2.producto_id
+        ) sub
+        LEFT JOIN seriales s ON p.producto_id = s.producto_id;
+        """
+        
+        cur.execute(query)
+        stats = dict(cur.fetchone())
+        cur.close()
+        
+        return jsonify(stats)
+        
+    except Exception as e:
+        print(f"Error en /estadisticas: {e}")
+        return jsonify({"error": f"Error al obtener estadísticas: {str(e)}"}), 500
     finally:
         if conn:
             conn.close()
@@ -450,6 +452,7 @@ def obtener_inventario_stock():
 @app.route('/api/inventario/tipos_pieza', methods=['GET', 'OPTIONS'])
 @protected_route
 def obtener_tipos_pieza():
+    """Obtiene todas las categorías de productos"""
     if request.method == 'OPTIONS':
         return jsonify({}), 200
     
@@ -468,25 +471,25 @@ def obtener_tipos_pieza():
         """
         
         cur.execute(query)
-        tipos = cur.fetchall()
+        tipos = [dict(row) for row in cur.fetchall()]
         cur.close()
         
-        tipos_list = [dict(row) for row in tipos]
-        return jsonify(tipos_list)
+        return jsonify(tipos)
     
     except Exception as e:
-        print(f"Error de DB en /tipos_pieza: {e}")
-        return jsonify({"error": f"Error al obtener tipos de pieza: {str(e)}"}), 500
+        print(f"Error en /tipos_pieza: {e}")
+        return jsonify({"error": f"Error al obtener tipos: {str(e)}"}), 500
     finally:
         if conn:
             conn.close()
 
 # ====================================================================
-# API: CREAR NUEVA CATEGORÍA DE PRODUCTO
+# API: CREAR NUEVA CATEGORÍA
 # ====================================================================
 @app.route('/api/inventario/tipos_pieza', methods=['POST', 'OPTIONS'])
 @protected_route
 def crear_tipo_pieza():
+    """Crea una nueva categoría de producto"""
     if request.method == 'OPTIONS':
         return jsonify({}), 200
     
@@ -500,7 +503,7 @@ def crear_tipo_pieza():
         tipo_modelo = data['tipo_modelo'].strip()
         
         if not tipo_modelo or len(tipo_modelo) < 2:
-            return jsonify({"error": "El nombre de la categoría debe tener al menos 2 caracteres"}), 400
+            return jsonify({"error": "El nombre debe tener al menos 2 caracteres"}), 400
         
         conn = get_db_connection()
         if not conn:
@@ -508,45 +511,42 @@ def crear_tipo_pieza():
             
         cur = conn.cursor(cursor_factory=DictCursor)
         
-        # Verificar si la categoría ya existe
+        # Verificar si ya existe
         cur.execute('SELECT "tipo_id" FROM "tipos_pieza" WHERE LOWER("tipo_modelo") = LOWER(%s)', (tipo_modelo,))
-        existe = cur.fetchone()
-        
-        if existe:
+        if cur.fetchone():
             return jsonify({"error": f"La categoría '{tipo_modelo}' ya existe"}), 409
         
-        # Insertar nueva categoría
+        # Insertar
         insert_query = """
         INSERT INTO "tipos_pieza" ("tipo_modelo")
         VALUES (%s)
-        RETURNING "tipo_id", "tipo_modelo", "fecha_creacion";
+        RETURNING "tipo_id", "tipo_modelo";
         """
         cur.execute(insert_query, (tipo_modelo,))
-        result = cur.fetchone()
+        result = dict(cur.fetchone())
         
         conn.commit()
         cur.close()
         
         return jsonify({
             "mensaje": f"Categoría '{tipo_modelo}' creada exitosamente",
-            "tipo_id": result['tipo_id'],
-            "tipo_modelo": result['tipo_modelo'],
-            "fecha_creacion": result['fecha_creacion'].isoformat() if result['fecha_creacion'] else None
+            "tipo": result
         }), 201
         
     except Exception as e:
         print(f"Error en POST /tipos_pieza: {e}")
-        return jsonify({"error": f"Error de base de datos: {str(e)}"}), 500
+        return jsonify({"error": f"Error: {str(e)}"}), 500
     finally:
         if conn:
             conn.close()
 
 # ====================================================================
-# API: INICIALIZAR TIPOS DE PIEZA PREDEFINIDOS
+# API: INICIALIZAR TIPOS PREDETERMINADOS
 # ====================================================================
 @app.route('/api/inventario/inicializar_tipos', methods=['POST', 'OPTIONS'])
 @protected_route
 def inicializar_tipos_pieza():
+    """Inicializa categorías predeterminadas si no existen"""
     if request.method == 'OPTIONS':
         return jsonify({}), 200
     
@@ -558,7 +558,6 @@ def inicializar_tipos_pieza():
             
         cur = conn.cursor(cursor_factory=DictCursor)
         
-        # Tipos predeterminados para una empresa de informática
         tipos_predeterminados = [
             'Computadoras y Laptops',
             'Servidores y Mainframe',
@@ -574,11 +573,11 @@ def inicializar_tipos_pieza():
             'Consumibles'
         ]
         
-        # Verificar cuáles tipos ya existen
+        # Verificar cuáles ya existen
         cur.execute('SELECT "tipo_modelo" FROM "tipos_pieza"')
         tipos_existentes = [row['tipo_modelo'] for row in cur.fetchall()]
         
-        # Insertar solo los tipos que no existen
+        # Insertar solo los que no existen
         tipos_insertados = 0
         for tipo in tipos_predeterminados:
             if tipo not in tipos_existentes:
@@ -592,14 +591,13 @@ def inicializar_tipos_pieza():
         cur.close()
         
         return jsonify({
-            "mensaje": f"Se inicializaron {tipos_insertados} nuevos tipos de producto",
-            "tipos_insertados": tipos_insertados,
-            "total_tipos": len(tipos_predeterminados)
+            "mensaje": f"Se inicializaron {tipos_insertados} nuevas categorías",
+            "tipos_insertados": tipos_insertados
         })
         
     except Exception as e:
         print(f"Error en /inicializar_tipos: {e}")
-        return jsonify({"error": f"Error al inicializar tipos: {str(e)}"}), 500
+        return jsonify({"error": f"Error: {str(e)}"}), 500
     finally:
         if conn:
             conn.close()
@@ -610,6 +608,7 @@ def inicializar_tipos_pieza():
 @app.route('/api/inventario/productos', methods=['GET', 'OPTIONS'])
 @protected_route
 def obtener_todos_los_productos():
+    """Obtiene lista completa de productos para selects"""
     if request.method == 'OPTIONS':
         return jsonify({}), 200
     
@@ -628,25 +627,25 @@ def obtener_todos_los_productos():
         """
         
         cur.execute(query)
-        productos = cur.fetchall()
+        productos = [dict(row) for row in cur.fetchall()]
         cur.close()
         
-        productos_list = [dict(row) for row in productos]
-        return jsonify(productos_list)
+        return jsonify(productos)
     
     except Exception as e:
-        print(f"Error de DB en /productos: {e}")
+        print(f"Error en /productos: {e}")
         return jsonify({"error": f"Error al obtener productos: {str(e)}"}), 500
     finally:
         if conn:
             conn.close()
 
 # ====================================================================
-# API: AGREGAR NUEVO PRODUCTO
+# API: AGREGAR NUEVO PRODUCTO (CON MARCA Y MODELO)
 # ====================================================================
 @app.route('/api/inventario/productos', methods=['POST', 'OPTIONS'])
 @protected_route
 def agregar_producto():
+    """Crea un nuevo producto con marca y modelo"""
     if request.method == 'OPTIONS':
         return jsonify({}), 200
     
@@ -654,13 +653,17 @@ def agregar_producto():
     try:
         data = request.get_json()
         
-        if not data or 'nombre' not in data or 'tipo_pieza_id' not in data or 'codigo_sku' not in data:
-            return jsonify({"error": "Faltan datos requeridos (nombre, tipo_pieza_id o codigo_sku)"}), 400
+        required = ['nombre', 'tipo_pieza_id', 'codigo_sku']
+        for field in required:
+            if field not in data:
+                return jsonify({"error": f"Falta campo: {field}"}), 400
 
-        nombre = data['nombre']
-        descripcion = data.get('descripcion', '')
-        tipo_pieza_id = data['tipo_pieza_id']
-        codigo_sku = data['codigo_sku']
+        nombre = data['nombre'].strip()
+        descripcion = data.get('descripcion', '').strip()
+        tipo_pieza_id = int(data['tipo_pieza_id'])
+        codigo_sku = data['codigo_sku'].strip()
+        marca = data.get('marca', '').strip()
+        modelo = data.get('modelo', '').strip()
         
         conn = get_db_connection()
         if not conn:
@@ -669,11 +672,11 @@ def agregar_producto():
         cur = conn.cursor(cursor_factory=DictCursor)
         
         insert_query = """
-        INSERT INTO "productos" ("nombre", "descripcion", "tipo_pieza_id", "codigo_sku")
-        VALUES (%s, %s, %s, %s)
+        INSERT INTO "productos" ("nombre", "descripcion", "tipo_pieza_id", "codigo_sku", "marca", "modelo")
+        VALUES (%s, %s, %s, %s, %s, %s)
         RETURNING "producto_id";
         """
-        cur.execute(insert_query, (nombre, descripcion, tipo_pieza_id, codigo_sku))
+        cur.execute(insert_query, (nombre, descripcion, tipo_pieza_id, codigo_sku, marca or None, modelo or None))
         
         result = cur.fetchone()
         producto_id = result['producto_id'] if result else None
@@ -682,15 +685,15 @@ def agregar_producto():
         cur.close()
         
         return jsonify({
-            "mensaje": f"Producto {nombre} agregado correctamente",
+            "mensaje": f"Producto '{nombre}' agregado correctamente",
             "producto_id": producto_id
         }), 201
 
-    except IntegrityError:
-        return jsonify({"error": f"El código SKU {codigo_sku} ya existe"}), 409
+    except IntegrityError as e:
+        return jsonify({"error": "Ya existe un producto similar"}), 409
     except Exception as e:
-        print(f"Error de DB en /productos (POST): {e}")
-        return jsonify({"error": f"Error de base de datos: {str(e)}"}), 500
+        print(f"Error agregando producto: {e}")
+        return jsonify({"error": f"Error: {str(e)}"}), 500
     finally:
         if conn:
             conn.close()
@@ -701,6 +704,7 @@ def agregar_producto():
 @app.route('/api/inventario/productos/<int:producto_id>', methods=['DELETE', 'OPTIONS'])
 @protected_route
 def eliminar_producto(producto_id):
+    """Elimina un producto y sus seriales asociados"""
     if request.method == 'OPTIONS':
         return jsonify({}), 200
     
@@ -715,36 +719,35 @@ def eliminar_producto(producto_id):
             
         cur = conn.cursor(cursor_factory=DictCursor)
         
-        # Verificar si tiene seriales
-        cur.execute('SELECT COUNT(*) as total FROM seriales WHERE producto_id = %s', (producto_id,))
-        if cur.fetchone()['total'] > 0:
-            return jsonify({"error": "Elimina primero los seriales de este producto"}), 400
-        
-        # Obtener nombre para el mensaje
+        # Obtener nombre para mensaje
         cur.execute('SELECT nombre FROM productos WHERE producto_id = %s', (producto_id,))
         producto = cur.fetchone()
         if not producto:
             return jsonify({"error": "Producto no encontrado"}), 404
         
-        # Eliminar
+        # Eliminar en orden: historial -> seriales -> producto
+        cur.execute('DELETE FROM historial_estados WHERE serial_id IN (SELECT serial_id FROM seriales WHERE producto_id = %s)', (producto_id,))
+        cur.execute('DELETE FROM seriales WHERE producto_id = %s', (producto_id,))
         cur.execute('DELETE FROM productos WHERE producto_id = %s', (producto_id,))
+        
         conn.commit()
         
         return jsonify({"mensaje": f"Producto '{producto['nombre']}' eliminado"})
         
     except Exception as e:
         print(f"Error eliminando producto: {e}")
-        return jsonify({"error": f"Error de base de datos: {str(e)}"}), 500
+        return jsonify({"error": f"Error: {str(e)}"}), 500
     finally:
         if conn:
             conn.close()
 
 # ====================================================================
-# API: INGRESAR NUEVO SERIAL - MEJORADO
+# API: REGISTRAR NUEVO SERIAL
 # ====================================================================
 @app.route('/api/inventario/serial', methods=['POST', 'OPTIONS'])
 @protected_route
 def agregar_serial():
+    """Registra un nuevo serial para un producto"""
     if request.method == 'OPTIONS':
         return jsonify({}), 200
     
@@ -769,13 +772,13 @@ def agregar_serial():
         producto = cur.fetchone()
         
         if not producto:
-            return jsonify({"error": f"El producto ID {producto_id} no existe"}), 404
+            return jsonify({"error": f"Producto ID {producto_id} no existe"}), 404
         
         # Verificar si el serial ya existe
         cur.execute('SELECT serial_id FROM seriales WHERE codigo_unico_serial = %s', (codigo_unico_serial,))
         if cur.fetchone():
             return jsonify({
-                "error": f"El serial {codigo_unico_serial} ya existe en el sistema",
+                "error": f"El serial {codigo_unico_serial} ya existe",
                 "codigo": "SERIAL_DUPLICADO"
             }), 409
         
@@ -794,23 +797,103 @@ def agregar_serial():
         cur.close()
         
         return jsonify({
-            "mensaje": f"Serial {codigo_unico_serial} agregado al producto {producto['nombre']}",
+            "mensaje": f"Serial {codigo_unico_serial} agregado",
             "serial_id": serial_id,
             "producto": producto['nombre']
         }), 201
 
     except IntegrityError as e:
+        return jsonify({"error": "Error de integridad de datos"}), 409
+    except Exception as e:
+        print(f"Error agregando serial: {e}")
+        return jsonify({"error": f"Error: {str(e)}"}), 500
+    finally:
         if conn:
-            conn.rollback()
+            conn.close()
+
+# ====================================================================
+# API: AGREGAR MÚLTIPLES SERIALES (NUEVO)
+# ====================================================================
+@app.route('/api/inventario/seriales/lote', methods=['POST', 'OPTIONS'])
+@protected_route
+def agregar_seriales_lote():
+    """Agrega múltiples seriales para un producto en un solo request"""
+    if request.method == 'OPTIONS':
+        return jsonify({}), 200
+    
+    conn = None
+    try:
+        data = request.get_json()
+        
+        if not data or 'producto_id' not in data or 'seriales' not in data:
+            return jsonify({"error": "Faltan datos (producto_id o seriales)"}), 400
+
+        producto_id = data['producto_id']
+        seriales_list = data['seriales']
+        estado = data.get('estado', 'ALMACEN')
+        
+        if not isinstance(seriales_list, list) or len(seriales_list) == 0:
+            return jsonify({"error": "'seriales' debe ser una lista no vacía"}), 400
+        
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({"error": "No se pudo conectar a la base de datos"}), 500
+            
+        cur = conn.cursor(cursor_factory=DictCursor)
+        
+        # Verificar producto
+        cur.execute('SELECT nombre FROM productos WHERE producto_id = %s', (producto_id,))
+        producto = cur.fetchone()
+        if not producto:
+            return jsonify({"error": f"Producto ID {producto_id} no existe"}), 404
+        
+        # Verificar seriales duplicados
+        seriales_duplicados = []
+        seriales_validos = []
+        
+        for serial in seriales_list:
+            serial_clean = str(serial).strip().upper()
+            if not serial_clean:
+                continue
+                
+            cur.execute('SELECT serial_id FROM seriales WHERE codigo_unico_serial = %s', (serial_clean,))
+            if cur.fetchone():
+                seriales_duplicados.append(serial_clean)
+            else:
+                seriales_validos.append(serial_clean)
+        
+        if seriales_duplicados:
+            return jsonify({
+                "error": "Algunos seriales ya existen",
+                "duplicados": seriales_duplicados
+            }), 409
+        
+        # Insertar seriales válidos
+        seriales_insertados = []
+        for serial in seriales_validos:
+            cur.execute("""
+                INSERT INTO "seriales" ("producto_id", "codigo_unico_serial", "estado")
+                VALUES (%s, %s, %s)
+                RETURNING "serial_id", "codigo_unico_serial";
+            """, (producto_id, serial, estado))
+            
+            resultado = cur.fetchone()
+            seriales_insertados.append(dict(resultado))
+        
+        conn.commit()
+        cur.close()
+        
         return jsonify({
-            "error": f"Error de integridad: El serial ya existe o datos inválidos",
-            "detalle": str(e)
-        }), 409
+            "mensaje": f"{len(seriales_insertados)} seriales agregados a '{producto['nombre']}'",
+            "seriales_agregados": seriales_insertados,
+            "total_agregado": len(seriales_insertados)
+        }), 201
+        
     except Exception as e:
         if conn:
             conn.rollback()
-        print(f"❌ Error de DB en /serial (POST): {e}")
-        return jsonify({"error": f"Error de base de datos: {str(e)}"}), 500
+        print(f"Error agregando seriales en lote: {e}")
+        return jsonify({"error": f"Error: {str(e)}"}), 500
     finally:
         if conn:
             conn.close()
@@ -821,6 +904,7 @@ def agregar_serial():
 @app.route('/api/inventario/seriales/<int:producto_id>', methods=['GET', 'OPTIONS'])
 @protected_route
 def obtener_seriales_por_producto(producto_id):
+    """Obtiene todos los seriales de un producto específico"""
     if request.method == 'OPTIONS':
         return jsonify({}), 200
     
@@ -842,15 +926,14 @@ def obtener_seriales_por_producto(producto_id):
         """
         
         cur.execute(query, (producto_id,))
-        seriales = cur.fetchall()
+        seriales = [dict(row) for row in cur.fetchall()]
         cur.close()
         
-        seriales_list = [dict(row) for row in seriales]
-        return jsonify(seriales_list)
+        return jsonify(seriales)
     
     except Exception as e:
-        print(f"Error de DB en /seriales: {e}")
-        return jsonify({"error": f"Error al obtener seriales: {str(e)}"}), 500
+        print(f"Error en /seriales: {e}")
+        return jsonify({"error": f"Error: {str(e)}"}), 500
     finally:
         if conn:
             conn.close()
@@ -861,6 +944,7 @@ def obtener_seriales_por_producto(producto_id):
 @app.route('/api/inventario/serial/<int:serial_id>', methods=['PUT', 'OPTIONS'])
 @protected_route
 def actualizar_estado_serial(serial_id):
+    """Actualiza el estado de un serial específico"""
     if request.method == 'OPTIONS':
         return jsonify({}), 200
     
@@ -907,18 +991,19 @@ def actualizar_estado_serial(serial_id):
         })
         
     except Exception as e:
-        print(f"Error de DB en /serial (PUT): {e}")
-        return jsonify({"error": f"Error de base de datos: {str(e)}"}), 500
+        print(f"Error actualizando serial: {e}")
+        return jsonify({"error": f"Error: {str(e)}"}), 500
     finally:
         if conn:
             conn.close()
 
 # ====================================================================
-# API: ELIMINAR SERIAL (SOLO ADMIN)
+# API: ELIMINAR SERIAL
 # ====================================================================
 @app.route('/api/inventario/serial/<int:serial_id>', methods=['DELETE', 'OPTIONS'])
 @protected_route
 def eliminar_serial(serial_id):
+    """Elimina un serial específico"""
     if request.method == 'OPTIONS':
         return jsonify({}), 200
     
@@ -933,25 +1018,29 @@ def eliminar_serial(serial_id):
             
         cur = conn.cursor(cursor_factory=DictCursor)
         
+        # Obtener información del serial
         cur.execute('SELECT "codigo_unico_serial" FROM "seriales" WHERE "serial_id" = %s', (serial_id,))
         serial = cur.fetchone()
         
         if not serial:
             return jsonify({"error": "Serial no encontrado"}), 404
         
-        delete_query = 'DELETE FROM "seriales" WHERE "serial_id" = %s'
-        cur.execute(delete_query, (serial_id,))
+        # Eliminar primero del historial
+        cur.execute('DELETE FROM "historial_estados" WHERE "serial_id" = %s', (serial_id,))
+        
+        # Eliminar serial
+        cur.execute('DELETE FROM "seriales" WHERE "serial_id" = %s', (serial_id,))
         
         conn.commit()
         cur.close()
         
         return jsonify({
-            "mensaje": f"Serial {serial['codigo_unico_serial']} eliminado permanentemente"
+            "mensaje": f"Serial {serial['codigo_unico_serial']} eliminado"
         })
         
     except Exception as e:
-        print(f"Error de DB en /serial (DELETE): {e}")
-        return jsonify({"error": f"Error de base de datos: {str(e)}"}), 500
+        print(f"Error eliminando serial: {e}")
+        return jsonify({"error": f"Error: {str(e)}"}), 500
     finally:
         if conn:
             conn.close()
@@ -962,6 +1051,7 @@ def eliminar_serial(serial_id):
 @app.route('/api/inventario/stock_bajo', methods=['GET', 'OPTIONS'])
 @protected_route
 def obtener_stock_bajo():
+    """Obtiene productos con stock bajo (3 o menos unidades en almacén)"""
     if request.method == 'OPTIONS':
         return jsonify({}), 200
     
@@ -989,25 +1079,87 @@ def obtener_stock_bajo():
         """
         
         cur.execute(query)
-        stock_bajo = cur.fetchall()
+        stock_bajo = [dict(row) for row in cur.fetchall()]
         cur.close()
         
-        stock_list = [dict(row) for row in stock_bajo]
-        return jsonify(stock_list)
+        return jsonify(stock_bajo)
     
     except Exception as e:
         print(f"Error en /stock_bajo: {e}")
-        return jsonify({"error": f"Error al obtener stock bajo: {str(e)}"}), 500
+        return jsonify({"error": f"Error: {str(e)}"}), 500
     finally:
         if conn:
             conn.close()
 
 # ====================================================================
-# API: OBTENER ESTADÍSTICAS
+# API: BUSCAR PRODUCTOS
 # ====================================================================
-@app.route('/api/inventario/estadisticas', methods=['GET', 'OPTIONS'])
+@app.route('/api/inventario/buscar', methods=['GET', 'OPTIONS'])
 @protected_route
-def obtener_estadisticas():
+def buscar_productos():
+    """Busca productos por nombre, SKU, marca o modelo"""
+    if request.method == 'OPTIONS':
+        return jsonify({}), 200
+    
+    conn = None
+    try:
+        query = request.args.get('q', '').strip()
+        
+        if not query or len(query) < 2:
+            return jsonify({"error": "Término de búsqueda muy corto (mínimo 2 caracteres)"}), 400
+        
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({"error": "No se pudo conectar a la base de datos"}), 500
+            
+        cur = conn.cursor(cursor_factory=DictCursor)
+        
+        search_query = """
+        SELECT 
+            p.producto_id,
+            p.nombre,
+            p.marca,
+            p.modelo,
+            p.codigo_sku,
+            tp.tipo_modelo as categoria,
+            COUNT(s.serial_id) as total_unidades,
+            SUM(CASE WHEN s.estado = 'ALMACEN' THEN 1 ELSE 0 END) as en_almacen
+        FROM productos p
+        JOIN tipos_pieza tp ON p.tipo_pieza_id = tp.tipo_id
+        LEFT JOIN seriales s ON p.producto_id = s.producto_id
+        WHERE p.nombre ILIKE %s 
+           OR p.codigo_sku ILIKE %s
+           OR p.marca ILIKE %s
+           OR p.modelo ILIKE %s
+        GROUP BY p.producto_id, p.nombre, p.marca, p.modelo, p.codigo_sku, tp.tipo_modelo
+        ORDER BY p.nombre;
+        """
+        
+        search_term = f"%{query}%"
+        cur.execute(search_query, (search_term, search_term, search_term, search_term))
+        resultados = [dict(row) for row in cur.fetchall()]
+        cur.close()
+        
+        return jsonify({
+            "query": query,
+            "resultados": resultados,
+            "total": len(resultados)
+        })
+        
+    except Exception as e:
+        print(f"Error en búsqueda: {e}")
+        return jsonify({"error": f"Error: {str(e)}"}), 500
+    finally:
+        if conn:
+            conn.close()
+
+# ====================================================================
+# API: OBTENER PRODUCTO POR ID
+# ====================================================================
+@app.route('/api/inventario/productos/<int:producto_id>', methods=['GET', 'OPTIONS'])
+@protected_route
+def obtener_producto_por_id(producto_id):
+    """Obtiene información detallada de un producto específico"""
     if request.method == 'OPTIONS':
         return jsonify({}), 200
     
@@ -1021,31 +1173,31 @@ def obtener_estadisticas():
         
         query = """
         SELECT 
-            COUNT(DISTINCT p.producto_id) as total_modelos,
-            COUNT(DISTINCT s.serial_id) as total_seriales,
-            COUNT(DISTINCT CASE WHEN sub.stock_actual <= 3 THEN sub.producto_id END) as modelos_stock_bajo
+            p.*,
+            tp.tipo_modelo as categoria_nombre,
+            COUNT(s.serial_id) as total_seriales,
+            SUM(CASE WHEN s.estado = 'ALMACEN' THEN 1 ELSE 0 END) as en_almacen
         FROM productos p
-        CROSS JOIN LATERAL (
-            SELECT 
-                p2.producto_id,
-                COUNT(s2.serial_id) as stock_actual
-            FROM productos p2
-            LEFT JOIN seriales s2 ON p2.producto_id = s2.producto_id AND s2.estado = 'ALMACEN'
-            WHERE p2.producto_id = p.producto_id
-            GROUP BY p2.producto_id
-        ) sub
-        LEFT JOIN seriales s ON p.producto_id = s.producto_id;
+        JOIN tipos_pieza tp ON p.tipo_pieza_id = tp.tipo_id
+        LEFT JOIN seriales s ON p.producto_id = s.producto_id
+        WHERE p.producto_id = %s
+        GROUP BY p.producto_id, p.nombre, p.descripcion, p.tipo_pieza_id, 
+                 p.codigo_sku, p.marca, p.modelo, p.fecha_registro, 
+                 p.fecha_actualizacion, tp.tipo_modelo;
         """
         
-        cur.execute(query)
-        stats = cur.fetchone()
+        cur.execute(query, (producto_id,))
+        producto = cur.fetchone()
         cur.close()
         
-        return jsonify(dict(stats))
-    
+        if not producto:
+            return jsonify({"error": "Producto no encontrado"}), 404
+        
+        return jsonify(dict(producto))
+        
     except Exception as e:
-        print(f"Error en /estadisticas: {e}")
-        return jsonify({"error": f"Error al obtener estadísticas: {str(e)}"}), 500
+        print(f"Error obteniendo producto: {e}")
+        return jsonify({"error": f"Error: {str(e)}"}), 500
     finally:
         if conn:
             conn.close()
@@ -1060,19 +1212,15 @@ if __name__ == '__main__':
     print("🚀 SISTEMA DE INVENTARIO - SOLUCIONES LÓGICAS")
     print("="*60)
     print(f"📦 Entorno: {FLASK_ENV}")
-    print(f"🔐 Autenticación: ROBUSTA (validación fuerte)")
+    print(f"🔐 Autenticación: Activa")
     print(f"👤 Usuario: admin")
     print(f"🔑 Contraseña: Admin123!")
     print(f"🌐 Puerto: {port}")
     print(f"🔒 Cookie Secure: {app.config['SESSION_COOKIE_SECURE']}")
-    print(f"🍪 Cookie HTTPOnly: {app.config['SESSION_COOKIE_HTTPONLY']}")
-    print(f"🔗 Cookie SameSite: {app.config['SESSION_COOKIE_SAMESITE']}")
-    print(f"⏰ Tiempo de sesión: 8 horas")
     print("\n📊 Endpoints disponibles:")
-    print(f"   /health                     - Health check")
-    print(f"   /api/debug/session         - Diagnóstico de sesión")
-    print(f"   /api/auth/*                - Autenticación")
-    print(f"   /api/inventario/*          - Gestión de inventario")
+    print(f"   /api/auth/*              - Autenticación")
+    print(f"   /api/inventario/*        - Gestión completa")
+    print(f"   /api/debug/database      - Diagnóstico")
     print("="*60)
     
     debug_mode = FLASK_ENV != 'production'

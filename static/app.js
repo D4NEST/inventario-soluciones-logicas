@@ -1043,46 +1043,183 @@ function renderSerialsTable(serials, productoNombre) {
             });
         }
     });
+    
     // ====================================================================
-// EVENTOS PARA SERIALES - NUEVA FUNCIÓN
+    // ¡¡¡LÍNEA CRÍTICA AÑADIDA!!!
+    // ====================================================================
+    attachSerialActionEvents(); // <-- ¡ESTO ES LO QUE FALTABA!
+}
+
+// ====================================================================
+// EVENTOS PARA SERIALES - NUEVA FUNCIÓN (MODIFICADA)
 // ====================================================================
 function attachSerialActionEvents() {
     console.log("🔧 Attaching serial action events...");
     
-    // Botones para cambiar estado de seriales
-    document.querySelectorAll('.change-status').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const serialId = this.dataset.serialId;
-            const estadoActual = this.dataset.currentStatus;
-            cambiarEstadoSerial(serialId, estadoActual);
-        });
-    });
-    
-    // Botones para eliminar seriales
-    document.querySelectorAll('.delete-serial').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const serialId = this.dataset.serialId;
-            const codigoSerial = this.dataset.serialCode;
-            eliminarSerial(serialId, codigoSerial);
-        });
-    });
-}
-
-function cambiarEstadoSerial(serialId, estadoActual) {
-    console.log(`🔄 Cambiando estado del serial ${serialId} desde ${estadoActual}`);
-    alert(`Funcionalidad en desarrollo: Cambiar estado del serial ${serialId}`);
-    // TODO: Implementar cambio de estado real
-}
-
-function eliminarSerial(serialId, codigoSerial) {
-    if (confirm(`¿Estás seguro de eliminar el serial ${codigoSerial}?`)) {
-        console.log(`🗑️ Eliminando serial ${serialId}`);
-        alert(`Funcionalidad en desarrollo: Eliminar serial ${codigoSerial}`);
-        // TODO: Implementar eliminación real
+    // Usar event delegation para manejar botones dinámicos
+    if (serialsTableBody) {
+        serialsTableBody.addEventListener('click', handleSerialActions);
     }
 }
 
-  
+function handleSerialActions(event) {
+    const target = event.target;
+    
+    // Verificar si se hizo click en un botón de cambio de estado
+    const changeStatusBtn = target.closest('.change-status');
+    if (changeStatusBtn) {
+        const serialId = changeStatusBtn.dataset.serialId;
+        const estadoActual = changeStatusBtn.dataset.currentStatus;
+        cambiarEstadoSerial(serialId, estadoActual);
+        return;
+    }
+    
+    // Verificar si se hizo click en un botón de eliminar
+    const deleteSerialBtn = target.closest('.delete-serial');
+    if (deleteSerialBtn) {
+        const serialId = deleteSerialBtn.dataset.serialId;
+        const codigoSerial = deleteSerialBtn.dataset.serialCode;
+        eliminarSerial(serialId, codigoSerial);
+        return;
+    }
+}
+
+async function cambiarEstadoSerial(serialId, estadoActual) {
+    // Crear modal para seleccionar nuevo estado
+    const modalHTML = `
+        <div class="modal" id="cambiarEstadoModal" style="display: flex;">
+            <div class="modal-content" style="max-width: 500px;">
+                <div class="modal-header">
+                    <h2><i class="fas fa-exchange-alt"></i> Cambiar Estado del Serial</h2>
+                    <button class="close-btn" onclick="cerrarModal('cambiarEstadoModal')">&times;</button>
+                </div>
+                <div style="padding: 25px;">
+                    <div class="alert alert-info" style="margin-bottom: 20px;">
+                        <i class="fas fa-info-circle"></i> 
+                        Estado actual: <strong>${estadoActual}</strong>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="nuevoEstadoSelect">
+                            <i class="fas fa-info-circle"></i> Nuevo estado
+                        </label>
+                        <select id="nuevoEstadoSelect" class="form-control">
+                            <option value="ALMACEN" ${estadoActual === 'ALMACEN' ? 'selected' : ''}>🟢 Almacén (Disponible)</option>
+                            <option value="INSTALADO" ${estadoActual === 'INSTALADO' ? 'selected' : ''}>🔵 Instalado (En uso)</option>
+                            <option value="DAÑADO" ${estadoActual === 'DAÑADO' ? 'selected' : ''}>🔴 Dañado (No usable)</option>
+                            <option value="RETIRADO" ${estadoActual === 'RETIRADO' ? 'selected' : ''}>🟡 Retirado (Fuera de servicio)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="notasCambioEstado">
+                            <i class="fas fa-sticky-note"></i> Notas (opcional)
+                        </label>
+                        <textarea id="notasCambioEstado" class="form-control" 
+                                  placeholder="Motivo del cambio de estado..." rows="3"></textarea>
+                    </div>
+                    
+                    <div style="display: flex; gap: 10px; margin-top: 25px;">
+                        <button type="button" class="btn btn-primary" style="flex: 1;" onclick="confirmarCambioEstado(${serialId})">
+                            <i class="fas fa-check-circle"></i> Confirmar Cambio
+                        </button>
+                        <button type="button" class="btn btn-danger" onclick="cerrarModal('cambiarEstadoModal')">
+                            <i class="fas fa-times"></i> Cancelar
+                        </button>
+                    </div>
+                    
+                    <div id="cambiarEstadoMessage" class="alert" style="display: none; margin-top: 20px;"></div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Agregar modal al DOM
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
+    // Animación
+    if (typeof anime !== 'undefined') {
+        const modal = document.getElementById('cambiarEstadoModal');
+        anime({
+            targets: modal.querySelector('.modal-content'),
+            opacity: [0, 1],
+            scale: [0.9, 1],
+            duration: 400,
+            easing: 'easeOutBack'
+        });
+    }
+}
+
+async function confirmarCambioEstado(serialId) {
+    const nuevoEstado = document.getElementById('nuevoEstadoSelect').value;
+    const notas = document.getElementById('notasCambioEstado').value.trim();
+    const messageDiv = document.getElementById('cambiarEstadoMessage');
+    
+    try {
+        const response = await secureFetch(`${INVENTARIO_URL}/seriales/${serialId}/estado`, {
+            method: 'PUT',
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ 
+                nuevo_estado: nuevoEstado,
+                notas: notas || `Cambio de estado realizado por ${currentUser?.name || 'usuario'}`
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            showMessage(messageDiv, `✅ ${result.mensaje || 'Estado cambiado correctamente'}`, "success");
+            
+            // Cerrar modal y actualizar después de 1.5 segundos
+            setTimeout(() => {
+                cerrarModal('cambiarEstadoModal');
+                
+                // Recargar los seriales si estamos en el modal de detalle
+                if (currentProductId) {
+                    mostrarSerialesDetalle(currentProductId, serialsModalTitle?.textContent.replace('Seriales: ', '') || '');
+                }
+                
+                // Actualizar la vista general
+                loadProductosDetallados();
+            }, 1500);
+        } else {
+            showMessage(messageDiv, `❌ ${result.error || 'No se pudo cambiar el estado'}`, "danger");
+        }
+    } catch (error) {
+        console.error('Error cambiando estado:', error);
+        showMessage(messageDiv, "❌ Error de conexión con el servidor", "danger");
+    }
+}
+
+async function eliminarSerial(serialId, codigoSerial) {
+    if (!confirm(`¿Estás seguro de eliminar el serial ${codigoSerial}?\n\nEsta acción no se puede deshacer y eliminará permanentemente este registro.`)) {
+        return;
+    }
+    
+    try {
+        const response = await secureFetch(`${INVENTARIO_URL}/seriales/${serialId}`, {
+            method: 'DELETE'
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            alert(`✅ ${result.mensaje || 'Serial eliminado correctamente'}`);
+            
+            // Recargar los seriales si estamos en el modal de detalle
+            if (currentProductId) {
+                mostrarSerialesDetalle(currentProductId, serialsModalTitle?.textContent.replace('Seriales: ', '') || '');
+            }
+            
+            // Actualizar la vista general
+            loadProductosDetallados();
+        } else {
+            alert(`❌ ${result.error || 'No se pudo eliminar el serial'}`);
+        }
+    } catch (error) {
+        console.error('Error eliminando serial:', error);
+        alert('❌ Error de conexión con el servidor');
+    }
 }
 
 // ====================================================================
@@ -1967,6 +2104,51 @@ const dynamicStyles = `
     cursor: not-allowed;
     transform: none;
 }
+
+/* ESTILOS PARA BOTONES DE ACCIÓN EN SERIALES */
+.action-buttons {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+}
+
+.btn-action {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--border-radius-sm);
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition);
+    font-size: 14px;
+}
+
+.btn-action:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-soft);
+}
+
+.change-status {
+    background: rgba(0, 102, 255, 0.1);
+    color: var(--color-primary);
+    border: 1px solid rgba(0, 102, 255, 0.2);
+}
+
+.change-status:hover {
+    background: rgba(0, 102, 255, 0.2);
+}
+
+.delete-serial {
+    background: rgba(255, 68, 68, 0.1);
+    color: var(--color-danger);
+    border: 1px solid rgba(255, 68, 68, 0.2);
+}
+
+.delete-serial:hover {
+    background: rgba(255, 68, 68, 0.2);
+}
 </style>
 `;
 
@@ -1977,3 +2159,4 @@ window.eliminarProducto = eliminarProducto;
 window.mostrarSerialesDetalle = mostrarSerialesDetalle;
 window.agregarStockMultiple = agregarStockMultiple;
 window.cerrarModal = cerrarModal;
+window.confirmarCambioEstado = confirmarCambioEstado; // <-- Nueva función exportada

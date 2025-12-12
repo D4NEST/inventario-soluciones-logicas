@@ -1473,12 +1473,187 @@ async function eliminarProducto(productoId, productoNombre) {
 }
 
 // ====================================================================
-// EDITAR PRODUCTO (TEMPORAL)
+// EDITAR PRODUCTO - FUNCIÓN COMPLETA
 // ====================================================================
-function editarProducto(productoId) {
-    console.log(`✏️ Editando producto ID: ${productoId}`);
-    alert(`Función de edición en desarrollo para producto ID: ${productoId}\n\nEsta funcionalidad permitirá modificar marca, modelo, SKU y categoría del producto.`);
-    // TODO: Implementar modal de edición completa
+async function editarProducto(productoId) {
+    try {
+        console.log(`✏️ Editando producto ID: ${productoId}`);
+        
+        // 1. Obtener datos actuales del producto
+        const response = await secureFetch(`${INVENTARIO_URL}/productos/${productoId}`);
+        if (!response.ok) throw new Error(`Error HTTP: ${response.status}`);
+        
+        const producto = await response.json();
+        
+        // 2. Obtener categorías disponibles
+        const categoriasResponse = await secureFetch(`${INVENTARIO_URL}/tipos_pieza`);
+        const categorias = await categoriasResponse.json();
+        
+        // 3. Crear modal de edición
+        const modalHTML = `
+            <div class="modal" id="editarProductoModal" style="display: flex;">
+                <div class="modal-content" style="max-width: 600px;">
+                    <div class="modal-header">
+                        <h2><i class="fas fa-edit"></i> Editar Producto</h2>
+                        <button class="close-btn" onclick="cerrarModal('editarProductoModal')">&times;</button>
+                    </div>
+                    <div style="padding: 25px;">
+                        <div class="alert alert-info" style="margin-bottom: 20px;">
+                            <i class="fas fa-info-circle"></i> 
+                            Editando: <strong>${producto.nombre.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</strong>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="editarNombre">
+                                <i class="fas fa-tag"></i> Nombre del Producto
+                            </label>
+                            <input type="text" id="editarNombre" class="form-control" 
+                                   value="${producto.nombre.replace(/"/g, '&quot;').replace(/'/g, "\\'")}"
+                                   required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="editarMarca">
+                                <i class="fas fa-tag"></i> Marca
+                            </label>
+                            <input type="text" id="editarMarca" class="form-control" 
+                                   value="${(producto.marca || '').replace(/"/g, '&quot;').replace(/'/g, "\\'")}"
+                                   required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="editarModelo">
+                                <i class="fas fa-cube"></i> Modelo
+                            </label>
+                            <input type="text" id="editarModelo" class="form-control" 
+                                   value="${(producto.modelo || '').replace(/"/g, '&quot;').replace(/'/g, "\\'")}"
+                                   required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="editarDescripcion">
+                                <i class="fas fa-align-left"></i> Descripción
+                            </label>
+                            <textarea id="editarDescripcion" class="form-control" rows="3">${producto.descripcion || ''}</textarea>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="editarCategoria">
+                                <i class="fas fa-folder"></i> Categoría
+                            </label>
+                            <select id="editarCategoria" class="form-control" required>
+                                <option value="">-- Selecciona categoría --</option>
+                                ${categorias.map(cat => `
+                                    <option value="${cat.tipo_id}" ${producto.tipo_pieza_id === cat.tipo_id ? 'selected' : ''}>
+                                        ${cat.tipo_modelo}
+                                    </option>
+                                `).join('')}
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="editarSKU">
+                                <i class="fas fa-barcode"></i> Código SKU
+                            </label>
+                            <input type="text" id="editarSKU" class="form-control" 
+                                   value="${producto.codigo_sku}"
+                                   required>
+                            <small style="color: var(--color-text-secondary); font-size: 12px; margin-top: 5px;">
+                                Código único. No puede repetirse con otros productos.
+                            </small>
+                        </div>
+                        
+                        <div style="display: flex; gap: 10px; margin-top: 25px;">
+                            <button type="button" class="btn btn-primary" style="flex: 1;" onclick="guardarCambiosProducto(${productoId})">
+                                <i class="fas fa-save"></i> Guardar Cambios
+                            </button>
+                            <button type="button" class="btn btn-danger" onclick="cerrarModal('editarProductoModal')">
+                                <i class="fas fa-times"></i> Cancelar
+                            </button>
+                        </div>
+                        
+                        <div id="editarProductoMessage" class="alert" style="display: none; margin-top: 20px;"></div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // 4. Agregar modal al DOM
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+        
+        // 5. Animación
+        if (typeof anime !== 'undefined') {
+            const modal = document.getElementById('editarProductoModal');
+            anime({
+                targets: modal.querySelector('.modal-content'),
+                opacity: [0, 1],
+                scale: [0.9, 1],
+                duration: 400,
+                easing: 'easeOutBack'
+            });
+        }
+        
+    } catch (error) {
+        console.error('❌ Error al cargar datos para edición:', error);
+        alert('Error al cargar datos del producto. Intenta de nuevo.');
+    }
+}
+
+// ====================================================================
+// GUARDAR CAMBIOS DE PRODUCTO
+// ====================================================================
+async function guardarCambiosProducto(productoId) {
+    const nombre = document.getElementById('editarNombre').value.trim();
+    const marca = document.getElementById('editarMarca').value.trim();
+    const modelo = document.getElementById('editarModelo').value.trim();
+    const descripcion = document.getElementById('editarDescripcion').value.trim();
+    const categoriaId = document.getElementById('editarCategoria').value;
+    const sku = document.getElementById('editarSKU').value.trim();
+    const messageDiv = document.getElementById('editarProductoMessage');
+    
+    // Validación
+    if (!nombre || !marca || !modelo || !categoriaId || !sku) {
+        showMessage(messageDiv, "❌ Todos los campos marcados son obligatorios", "danger");
+        return;
+    }
+    
+    try {
+        const response = await secureFetch(`${INVENTARIO_URL}/productos/${productoId}`, {
+            method: 'PUT',
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                nombre: nombre,
+                marca: marca,
+                modelo: modelo,
+                descripcion: descripcion,
+                tipo_pieza_id: parseInt(categoriaId),
+                codigo_sku: sku
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            showMessage(messageDiv, `✅ ${result.mensaje || 'Producto actualizado correctamente'}`, "success");
+            
+            // Actualizar después de 1.5 segundos
+            setTimeout(() => {
+                cerrarModal('editarProductoModal');
+                loadProductosDetallados(); // Recargar tabla
+                
+                // Actualizar caché si es necesario
+                ALL_PRODUCT_MODELS = [];
+                inventoryCache = null;
+                
+                console.log(`✅ Producto ${productoId} actualizado`);
+            }, 1500);
+        } else {
+            showMessage(messageDiv, `❌ ${result.error || 'No se pudo actualizar el producto'}`, "danger");
+        }
+    } catch (error) {
+        console.error('❌ Error guardando cambios:', error);
+        showMessage(messageDiv, "❌ Error de conexión con el servidor", "danger");
+    }
 }
 
 // ====================================================================
@@ -2176,3 +2351,4 @@ window.agregarStockMultiple = agregarStockMultiple;
 window.cerrarModal = cerrarModal;
 window.confirmarCambioEstado = confirmarCambioEstado;
 window.editarProducto = editarProducto;
+window.guardarCambiosProducto = guardarCambiosProducto; // <-- ¡NUEVA!
